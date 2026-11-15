@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id                 String   @id @default(cuid())
+  nombre             String
+  email              String   @unique
+  passwordHash       String
+  rol                String
+  telefono           String?
+  mercado            String?
+  puesto             String?
+  organizacion       String?
+  estadoVerificacion String   @default("VERIFICADO")
+  motivoRechazo      String?
+  direccion          String?
+  lat                Float?
+  lng                Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  publicaciones Publicacion[] @relation("ComerciantePublicaciones")
+  reservas      Reserva[]     @relation("ReceptorReservas")
+}
+
+model Publicacion {
+  id                 String   @id @default(cuid())
+  comercianteId      String
+  comerciante        Usuario  @relation("ComerciantePublicaciones", fields: [comercianteId], references: [id], onDelete: Cascade)
+  categoria          String
+  cantidadAproximada String
+  descripcion        String?
+  fotoUrl            String?
+  mercado            String
+  direccionTexto     String
+  lat                Float
+  lng                Float
+  ventanaInicio      DateTime
+  ventanaFin         DateTime
+  estado             String   @default("DISPONIBLE")
+  reportada          Boolean  @default(false)
+  motivoReporte      String?
+  ocultaPorAdmin     Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  reservas Reserva[]
+
+  @@index([estado, ocultaPorAdmin])
+  @@index([comercianteId])
+}
+
+model Reserva {
+  id                      String    @id @default(cuid())
+  publicacionId           String
+  publicacion             Publicacion @relation(fields: [publicacionId], references: [id], onDelete: Cascade)
+  receptorId              String
+  receptor                Usuario   @relation("ReceptorReservas", fields: [receptorId], references: [id], onDelete: Cascade)
+  codigoRetiro            String?
+  ventanaRetiroInicio     DateTime
+  ventanaRetiroFin        DateTime
+  estado                  String    @default("ACTIVA")
+  confirmadoReceptor      Boolean   @default(false)
+  confirmadoComerciante   Boolean   @default(false)
+  confirmadoReceptorAt    DateTime?
+  confirmadoComercianteAt DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([receptorId])
+  @@index([publicacionId])
+}
+
+model MetricaUsabilidad {
+  id                String   @id @default(cuid())
+  tipo              String   // "TIEMPO_PUBLICACION" | "ENCUESTA_SUS"
+  rol               String
+  valor             Float    // segundos en publicación, o ítem 1 (1..5) en SUS
+  puntajeSecundario Float?   // ítem 2 (1..5) en SUS
+  createdAt         DateTime @default(now())
+}

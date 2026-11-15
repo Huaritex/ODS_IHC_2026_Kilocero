@@ -1,0 +1,43 @@
+# Kilo Cero — MVP HCI (UCB Santa Cruz)
+
+Aplicación web responsive para conectar el excedente diario de alimentos de mercados de Santa Cruz de la Sierra (**Abasto, Mutualista y Los Pozos**) con comedores populares, hogares vulnerables y ONGs antes del cierre (17:00–19:00).
+
+## Requisitos previos y puesta en marcha
+
+1. **Variables de entorno**
+   Copiá `.env.example` a `.env` (usa SQLite local en `prisma/dev.db`, sin servicios externos):
+   ```bash
+   cp .env.example .env
+   ```
+   ```env
+   DATABASE_URL="file:./dev.db"
+   AUTH_SECRET="tu-secreto-largo"
+   ```
+
+2. **Instalar dependencias, sincronizar esquema y cargar datos de Santa Cruz**
+   ```bash
+   npm install
+   npx prisma generate
+   npx prisma db push
+   npm run db:seed
+   npm run dev
+   ```
+
+3. **Cuentas de demostración (clave: `kilocero2026`)**
+   - **Comerciante:** `carmen@abasto.bo` (Mercado Abasto) / `mateo@mutualista.bo` / `rosaura@lospozos.bo`
+   - **Receptor verificado:** `comedor@cotoca.bo` / `hogar@teresa.bo`
+   - **Receptor pendiente (para probar aprobación):** `ollacomun@plan3000.bo`
+   - **Admin:** `admin@kilocero.bo`
+
+## Decisiones de diseño y heurísticas de Nielsen por pantalla
+
+- **Login / Registro (`/login`, `/registro`):** Separación clara de roles y botones de acceso demo para reducir fricción en pruebas de usabilidad (*Flexibilidad y eficiencia de uso*).
+- **Comerciante — Mis avisos (`/comerciante`):** Barra inferior fija en la zona del pulgar (≥48x48 px), estado siempre visible con ícono+texto+borde (*Visibilidad del estado del sistema*) y cola local visible ("Pendiente de envío") cuando falla la red. Confirmación modal únicamente al cerrar una publicación de forma irreversible (*Prevención de errores*).
+- **Comerciante — Publicar (`/comerciante/publicar`):** Optimizada para <20 segundos con una mano: selección visual por íconos grandes de categoría y cantidad aproximada ("Poco / Medio / Mucho", sin pedir peso exacto) + puesto prellenado (*Reconocimiento antes que recuerdo*).
+- **Receptor — Explorar (`/receptor`):** Toggle Lista/Mapa (Leaflet + OpenStreetMap sin API keys) y filtros por categoría en la parte superior para decidir rápido según cercanía y horario (*Control y libertad del usuario*).
+- **Receptor — Detalle y Reservas (`/receptor/publicaciones/[id]`, `/receptor/reservas`):** Flujo explícito `disponible → reservado → retirado → confirmado`, con doble confirmación de entrega y modal de confirmación solo al cancelar una reserva (*Prevención de errores*).
+- **Admin (`/admin`, `/admin/receptores`, `/admin/publicaciones`):** Layout de escritorio con skip-link, landmarks ARIA, navegación completa por teclado y tablas semánticas; métricas de impacto calculadas automáticamente desde entregas confirmadas.
+
+## Notas de despliegue
+
+Este MVP corre con SQLite local (`prisma/dev.db`) para demostración inmediata sin dependencias externas. Si más adelante querés subirlo a un entorno serverless como Vercel, solo cambiás `provider = "sqlite"` en `prisma/schema.prisma` por un Postgres administrado.
