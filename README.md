@@ -62,9 +62,12 @@ La persistencia es **local con SQLite (Prisma)** en `prisma/dev.db`: sobrevive a
 
 ## Organización del código
 
-- `src/app/(admin|comerciante|receptor|auth)`: páginas por rol (route groups).
-- `src/components`: componentes reutilizables (`ui/`, `publicar/`, `comerciante/`, `receptor/`).
-- `src/lib`: acceso a la API (`api-client`), utilidades (`formato`, `ventanas`, `lugar`, `explorar`), reglas de negocio (`admin-acciones`, `expiracion`, `privacidad`) y cola offline.
+- `src/app/(admin|comerciante|receptor|auth)`: páginas por rol (route groups). Cada `page.tsx` solo maneja estado y compone componentes.
+- `src/app/api`: rutas del "servicio de datos" (controladores finos: sesión, validación y despacho).
+- `src/components`: UI reutilizable (`ui/`, `admin/`, `auth/`, `publicar/`, `comerciante/`, `receptor/`).
+- `src/hooks`: hooks compartidos (`useCarga` para listados con estado de carga/error).
+- `src/lib`: acceso a la API (`api-client`), reglas de negocio (`publicaciones-acciones`, `admin-acciones`, `expiracion`, `privacidad`, `rate-limit`, `fotos`), utilidades (`formato`, `ventanas`, `lugar`, `explorar`) y cola offline.
+- `src/proxy.ts`: guardia de rutas por rol.
 - `prisma/schema.prisma` y `prisma/seed.ts`: modelo de datos y datos de Santa Cruz.
 
 ## Seguridad y privacidad

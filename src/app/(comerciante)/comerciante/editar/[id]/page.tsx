@@ -3,13 +3,15 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Camera, Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import type { CantidadAproximada, CategoriaAlimento } from "@/lib/types";
 import { MERCADOS_SANTA_CRUZ } from "@/lib/constants";
 import { formatHora } from "@/lib/formato";
 import { comprimirFoto } from "@/lib/foto-cliente";
 import { SelectorCategoria } from "@/components/publicar/SelectorCategoria";
 import { SelectorCantidad } from "@/components/publicar/SelectorCantidad";
+import { ExtenderVentana } from "@/components/publicar/ExtenderVentana";
+import { FotoEditable } from "@/components/publicar/FotoEditable";
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ToastProvider";
 
@@ -24,14 +26,6 @@ interface Pub {
   ventanaFin: string;
   estado: string;
 }
-
-const EXTENSIONES = [
-  { min: 0, label: "Sin cambios" },
-  { min: 30, label: "+30 min" },
-  { min: 60, label: "+1 hora" },
-  { min: 120, label: "+2 horas" },
-];
-
 
 export default function EditarPublicacionPage() {
   const { id } = useParams<{ id: string }>();
@@ -163,28 +157,7 @@ export default function EditarPublicacionPage() {
 
       <SelectorCantidad legend="Cantidad aproximada" value={cantidad} onChange={setCantidad} />
 
-      <fieldset>
-        <legend className="text-sm font-black uppercase tracking-wide text-slate-950">
-          Extender hora de retiro
-        </legend>
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {EXTENSIONES.map((x) => (
-            <button
-              key={x.min}
-              type="button"
-              aria-pressed={extender === x.min}
-              onClick={() => setExtender(x.min)}
-              className={`min-h-[48px] rounded-xl border-2 px-2 text-sm font-extrabold ${
-                extender === x.min
-                  ? "border-emerald-950 bg-emerald-100 text-emerald-950"
-                  : "border-slate-300 bg-white text-slate-900 hover:border-slate-600"
-              }`}
-            >
-              {x.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <ExtenderVentana value={extender} onChange={setExtender} />
 
       <div>
         <label htmlFor="mercado" className="text-sm font-black uppercase tracking-wide text-slate-950">
@@ -234,39 +207,13 @@ export default function EditarPublicacionPage() {
         <p className="mt-1 text-right text-xs font-bold text-slate-600">{descripcion.length}/140</p>
       </div>
 
-      <div className="space-y-2">
-        {(fotoNueva || (pub.fotoUrl && !quitarFoto)) && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={fotoNueva || pub.fotoUrl || ""}
-            alt="Foto del aviso"
-            className="h-40 w-full rounded-2xl border-2 border-slate-900 object-cover"
-          />
-        )}
-        <label className="flex min-h-[52px] cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-slate-100 px-4 text-sm font-extrabold text-slate-950">
-          <Camera className="h-5 w-5" aria-hidden="true" />
-          <span>{pub.fotoUrl || fotoNueva ? "Cambiar foto" : "Agregar foto"}</span>
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={elegirFoto}
-            className="sr-only"
-          />
-        </label>
-        {(pub.fotoUrl || fotoNueva) && (
-          <label className="flex min-h-[48px] cursor-pointer items-center gap-3 text-sm font-extrabold text-slate-950">
-            <input
-              type="checkbox"
-              className="h-6 w-6 accent-rose-700"
-              checked={quitarFoto && !fotoNueva}
-              disabled={Boolean(fotoNueva)}
-              onChange={(e) => setQuitarFoto(e.target.checked)}
-            />
-            Quitar la foto
-          </label>
-        )}
-      </div>
+      <FotoEditable
+        fotoActual={pub.fotoUrl}
+        fotoNueva={fotoNueva}
+        quitar={quitarFoto}
+        onElegir={elegirFoto}
+        onQuitar={setQuitarFoto}
+      />
 
       <button
         type="submit"

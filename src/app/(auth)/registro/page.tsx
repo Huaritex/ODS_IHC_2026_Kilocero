@@ -1,28 +1,38 @@
 "use client";
 
-import { api } from "@/lib/api-client";
-import React, { useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Store, HeartHandshake, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
+import { api } from "@/lib/api-client";
 import { MERCADOS_SANTA_CRUZ } from "@/lib/constants";
+import { CampoTexto } from "@/components/auth/CampoTexto";
+import { SelectorRol, type RolRegistro } from "@/components/auth/SelectorRol";
 import { useToast } from "@/components/ToastProvider";
 
 export default function RegistroPage() {
   const router = useRouter();
   const { notify } = useToast();
 
-  const [rol, setRol] = useState<"COMERCIANTE" | "RECEPTOR">("COMERCIANTE");
-  const [nombre, setNombre] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [mercado, setMercado] = useState(MERCADOS_SANTA_CRUZ[0].nombre);
-  const [puesto, setPuesto] = useState("");
-  const [organizacion, setOrganizacion] = useState("");
-  const [direccion, setDireccion] = useState("");
+  const [rol, setRol] = useState<RolRegistro>("COMERCIANTE");
+  const [form, setForm] = useState({
+    nombre: "",
+    email: "",
+    password: "",
+    telefono: "",
+    mercado: MERCADOS_SANTA_CRUZ[0].nombre as string,
+    puesto: "",
+    organizacion: "",
+    direccion: "",
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const campo = (k: keyof typeof form) => ({
+    value: form[k],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm((f) => ({ ...f, [k]: e.target.value })),
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,17 +41,7 @@ export default function RegistroPage() {
 
     const r = await api<{ redirectTo: string }>("/api/auth/register", {
       method: "POST",
-      json: {
-        rol,
-        nombre,
-        email,
-        password,
-        telefono,
-        mercado,
-        puesto,
-        organizacion,
-        direccion,
-      },
+      json: { rol, ...form },
     });
     if (!r.ok || !r.data) {
       setError(r.error || "No pudimos crear tu cuenta.");
@@ -68,9 +68,7 @@ export default function RegistroPage() {
         >
           ← Volver al inicio
         </Link>
-        <h1 className="mt-3 text-3xl font-black text-slate-950">
-          Crear cuenta
-        </h1>
+        <h1 className="mt-3 text-3xl font-black text-slate-950">Crear cuenta</h1>
 
         {error && (
           <div
@@ -82,76 +80,19 @@ export default function RegistroPage() {
         )}
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <fieldset>
-            <legend className="text-sm font-extrabold text-slate-950">
-              ¿Cuál es tu rol?
-            </legend>
-            <div
-              role="radiogroup"
-              aria-label="Selección de rol"
-              className="mt-2 grid grid-cols-2 gap-3"
-            >
-              <button
-                type="button"
-                role="radio"
-                aria-checked={rol === "COMERCIANTE"}
-                onClick={() => setRol("COMERCIANTE")}
-                className={`flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl border-2 p-3 text-sm font-extrabold ${
-                  rol === "COMERCIANTE"
-                    ? "border-emerald-900 bg-emerald-100 text-emerald-950"
-                    : "border-slate-300 bg-white text-slate-800"
-                }`}
-              >
-                <Store className="h-5 w-5" aria-hidden="true" />
-                <span>Comerciante</span>
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={rol === "RECEPTOR"}
-                onClick={() => setRol("RECEPTOR")}
-                className={`flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl border-2 p-3 text-sm font-extrabold ${
-                  rol === "RECEPTOR"
-                    ? "border-sky-900 bg-sky-100 text-sky-950"
-                    : "border-slate-300 bg-white text-slate-800"
-                }`}
-              >
-                <HeartHandshake className="h-5 w-5" aria-hidden="true" />
-                <span>Comedor / ONG</span>
-              </button>
-            </div>
-          </fieldset>
+          <SelectorRol value={rol} onChange={setRol} />
 
-          <div>
-            <label
-              htmlFor="nombre"
-              className="block text-sm font-extrabold text-slate-950"
-            >
-              Nombre completo
-            </label>
-            <input
-              id="nombre"
-              required
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej. Juana Pérez"
-              className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-4 text-base"
-            />
-          </div>
+          <CampoTexto id="nombre" label="Nombre completo" required placeholder="Ej. Juana Pérez" {...campo("nombre")} />
 
           {rol === "COMERCIANTE" ? (
             <>
               <div>
-                <label
-                  htmlFor="mercado"
-                  className="block text-sm font-extrabold text-slate-950"
-                >
+                <label htmlFor="mercado" className="block text-sm font-extrabold text-slate-950">
                   Mercado habitual
                 </label>
                 <select
                   id="mercado"
-                  value={mercado}
-                  onChange={(e) => setMercado(e.target.value)}
+                  {...campo("mercado")}
                   className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 bg-white px-4 text-base font-semibold"
                 >
                   {MERCADOS_SANTA_CRUZ.map((m) => (
@@ -161,110 +102,18 @@ export default function RegistroPage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label
-                  htmlFor="puesto"
-                  className="block text-sm font-extrabold text-slate-950"
-                >
-                  Número de puesto / sector
-                </label>
-                <input
-                  id="puesto"
-                  value={puesto}
-                  onChange={(e) => setPuesto(e.target.value)}
-                  placeholder="Ej. Pasillo 2, Puesto 14"
-                  className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-4 text-base"
-                />
-              </div>
+              <CampoTexto id="puesto" label="Número de puesto / sector" placeholder="Ej. Pasillo 2, Puesto 14" {...campo("puesto")} />
             </>
           ) : (
             <>
-              <div>
-                <label
-                  htmlFor="organizacion"
-                  className="block text-sm font-extrabold text-slate-950"
-                >
-                  Nombre del comedor, hogar u ONG
-                </label>
-                <input
-                  id="organizacion"
-                  required
-                  value={organizacion}
-                  onChange={(e) => setOrganizacion(e.target.value)}
-                  placeholder="Ej. Comedor Barrio Lindo"
-                  className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-4 text-base"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="direccion"
-                  className="block text-sm font-extrabold text-slate-950"
-                >
-                  Dirección / Zona
-                </label>
-                <input
-                  id="direccion"
-                  value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
-                  placeholder="Ej. Plan 3000, Av. Paurito"
-                  className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-4 text-base"
-                />
-              </div>
+              <CampoTexto id="organizacion" label="Nombre del comedor, hogar u ONG" required placeholder="Ej. Comedor Barrio Lindo" {...campo("organizacion")} />
+              <CampoTexto id="direccion" label="Dirección / Zona" placeholder="Ej. Plan 3000, Av. Paurito" {...campo("direccion")} />
             </>
           )}
 
-          <div>
-            <label
-              htmlFor="telefono"
-              className="block text-sm font-extrabold text-slate-950"
-            >
-              WhatsApp / Teléfono (opcional)
-            </label>
-            <input
-              id="telefono"
-              type="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              placeholder="+591 7..."
-              className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-4 text-base"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="reg-email"
-              className="block text-sm font-extrabold text-slate-950"
-            >
-              Correo electrónico
-            </label>
-            <input
-              id="reg-email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="correo@ejemplo.bo"
-              className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-4 text-base"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="reg-password"
-              className="block text-sm font-extrabold text-slate-950"
-            >
-              Contraseña (mín. 6 caracteres)
-            </label>
-            <input
-              id="reg-password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-4 text-base"
-            />
-          </div>
+          <CampoTexto id="telefono" type="tel" label="WhatsApp / Teléfono (opcional)" placeholder="+591 7..." {...campo("telefono")} />
+          <CampoTexto id="reg-email" type="email" required label="Correo electrónico" placeholder="correo@ejemplo.bo" {...campo("email")} />
+          <CampoTexto id="reg-password" type="password" required minLength={6} label="Contraseña (mín. 6 caracteres)" {...campo("password")} />
 
           <button
             type="submit"

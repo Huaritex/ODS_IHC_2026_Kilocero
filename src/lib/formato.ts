@@ -11,3 +11,8 @@ export function formatWhatsappUrl(telefono: string): string {
   const digits = telefono.replace(/\D/g, "");
   return `https://wa.me/${digits.startsWith("591") ? digits : `591${digits}`}`;
 }
+
+/** Enlace de Google Maps con indicaciones hacia unas coordenadas. */
+export function mapsDireccionesUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+}

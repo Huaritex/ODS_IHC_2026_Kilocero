@@ -1,59 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
-import { lugarPublicacion } from "@/lib/lugar";
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  CheckCircle2,
-  Clock,
-  MapPin,
-  XCircle,
-  Navigation,
-  MessageCircle,
-  Phone,
-} from "lucide-react";
-import type {
-  CantidadAproximada,
-  CategoriaAlimento,
-  EstadoPublicacion,
-} from "@/lib/types";
-import { CANTIDAD_MAP, CATEGORIA_MAP } from "@/lib/constants";
-import { EstadoPublicacionBadge } from "@/components/ui/EstadoBadge";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EncuestaUsabilidadModal } from "@/components/EncuestaUsabilidadModal";
+import { ReservaCard, type ReservaItem } from "@/components/receptor/ReservaCard";
 import { useToast } from "@/components/ToastProvider";
-
-interface ReservaItem {
-  id: string;
-  codigoRetiro: string | null;
-  estado: "ACTIVA" | "COMPLETADA" | "CANCELADA" | "EXPIRADA";
-  motivoCancelacion?: string | null;
-  confirmadoReceptor: boolean;
-  confirmadoComerciante: boolean;
-  ventanaRetiroInicio: string;
-  ventanaRetiroFin: string;
-  publicacion: {
-    id: string;
-    categoria: CategoriaAlimento;
-    cantidadAproximada: CantidadAproximada;
-    mercado: string;
-    direccionTexto: string;
-    lat: number;
-    lng: number;
-    estado: EstadoPublicacion;
-    comerciante: {
-      nombre: string;
-      puesto: string | null;
-      telefono: string | null;
-    };
-  };
-}
-
-function formatWhatsappUrl(telefono: string) {
-  const digits = telefono.replace(/\D/g, "");
-  return `https://wa.me/${digits.startsWith("591") ? digits : `591${digits}`}`;
-}
 
 export default function ReceptorReservasPage() {
   const { notify } = useToast();
@@ -136,160 +89,15 @@ export default function ReceptorReservasPage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {reservas.map((r) => {
-            const cat = CATEGORIA_MAP[r.publicacion.categoria];
-            const cant = CANTIDAD_MAP[r.publicacion.cantidadAproximada];
-            const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${r.publicacion.lat},${r.publicacion.lng}`;
-            const tel = r.publicacion.comerciante.telefono;
-
-            return (
-              <li
-                key={r.id}
-                className="rounded-2xl border-2 border-slate-900 bg-white p-4 shadow-sm"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-3xl" aria-hidden="true">
-                      {cat.emoji}
-                    </span>
-                    <div>
-                      <h3 className="text-lg font-black text-slate-950">
-                        {cat.label} · {cant.label}
-                      </h3>
-                      <p className="text-xs font-bold text-slate-700">
-                        {r.publicacion.comerciante.nombre}
-                      </p>
-                    </div>
-                  </div>
-                  <EstadoPublicacionBadge estado={r.publicacion.estado} />
-                </div>
-
-                {(r.estado === "CANCELADA" || r.estado === "EXPIRADA") &&
-                  r.motivoCancelacion && (
-                    <p
-                      role="status"
-                      className="mt-3 rounded-xl border-2 border-rose-800 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-950"
-                    >
-                      Reserva {r.estado === "CANCELADA" ? "cancelada" : "vencida"}
-                      : {r.motivoCancelacion}
-                    </p>
-                  )}
-
-                {r.codigoRetiro && r.estado === "ACTIVA" && (
-                  <div className="mt-3 rounded-xl border-2 border-slate-900 bg-amber-100 px-3 py-2 text-center">
-                    <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-800">
-                      Mostrale este código al comerciante
-                    </p>
-                    <p className="text-xl font-black tracking-widest text-slate-950">
-                      {r.codigoRetiro}
-                    </p>
-                  </div>
-                )}
-
-                <div className="mt-3 space-y-1 text-sm font-bold text-slate-800">
-                  <p className="flex items-center gap-1.5 text-slate-950">
-                    <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>
-                      {lugarPublicacion(r.publicacion)}
-                    </span>
-                  </p>
-                  <p className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>
-                      Retiro:{" "}
-                      {new Date(r.ventanaRetiroInicio).toLocaleTimeString(
-                        "es-BO",
-                        { hour: "2-digit", minute: "2-digit" }
-                      )}{" "}
-                      –{" "}
-                      {new Date(r.ventanaRetiroFin).toLocaleTimeString(
-                        "es-BO",
-                        { hour: "2-digit", minute: "2-digit" }
-                      )}
-                    </span>
-                  </p>
-                </div>
-
-                <p className="mt-2 text-xs font-extrabold text-slate-700">
-                  {r.confirmadoReceptor
-                    ? "✓ Vos confirmaste el retiro"
-                    : "◷ Confirmá al recibir los alimentos en el puesto"}
-                  {" · "}
-                  {r.confirmadoComerciante
-                    ? "✓ Comerciante confirmó"
-                    : "◷ Falta confirmación del comerciante"}
-                </p>
-
-                {r.estado === "ACTIVA" && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <a
-                      href={mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 bg-slate-100 px-3 text-xs font-extrabold text-slate-950 hover:bg-slate-200"
-                    >
-                      <Navigation className="h-4 w-4" aria-hidden="true" />
-                      <span>Cómo llegar</span>
-                    </a>
-                    {tel && (
-                      <>
-                        <a
-                          href={formatWhatsappUrl(tel)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border-2 border-emerald-900 bg-emerald-100 px-3 text-xs font-extrabold text-emerald-950 hover:bg-emerald-200"
-                        >
-                          <MessageCircle
-                            className="h-4 w-4"
-                            aria-hidden="true"
-                          />
-                          <span>WhatsApp</span>
-                        </a>
-                        <a
-                          href={`tel:${tel}`}
-                          className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white px-3 text-xs font-extrabold text-slate-950 hover:bg-slate-100"
-                        >
-                          <Phone className="h-4 w-4" aria-hidden="true" />
-                          <span>Llamar</span>
-                        </a>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {r.estado === "ACTIVA" && (
-                  <div className="mt-3 flex flex-col gap-2">
-                    {!r.confirmadoReceptor && (
-                      <button
-                        type="button"
-                        disabled={actionId === r.id}
-                        onClick={() => confirmarRetiro(r.id)}
-                        className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 text-base font-extrabold text-white hover:bg-emerald-900 disabled:opacity-60"
-                      >
-                        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                        <span>
-                          {actionId === r.id
-                            ? "Confirmando..."
-                            : "Confirmar que ya retiré"}
-                        </span>
-                      </button>
-                    )}
-
-                    {!r.confirmadoReceptor && (
-                      <button
-                        type="button"
-                        onClick={() => setCancelTargetId(r.id)}
-                        className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border-2 border-rose-800 bg-white px-4 text-sm font-extrabold text-rose-900 hover:bg-rose-50"
-                      >
-                        <XCircle className="h-4 w-4" aria-hidden="true" />
-                        <span>Cancelar reserva</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
+          {reservas.map((r) => (
+            <ReservaCard
+              key={r.id}
+              r={r}
+              confirmando={actionId === r.id}
+              onConfirmar={() => confirmarRetiro(r.id)}
+              onCancelar={() => setCancelTargetId(r.id)}
+            />
+          ))}
         </ul>
       )}
 
