@@ -22,7 +22,7 @@ export default async function AdminLayout({
   ]);
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen overflow-x-clip bg-slate-100">
       <a
         href="#admin-main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-slate-950 focus:px-4 focus:py-2 focus:text-white"
@@ -37,10 +37,10 @@ export default async function AdminLayout({
         maxWidthClass="max-w-6xl"
       />
 
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[240px_1fr]">
+      <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 lg:py-6">
         <aside
           aria-label="Menú de administración"
-          className="sticky top-0 z-20 -mt-2 bg-slate-100 py-2 lg:static lg:z-auto lg:mt-0 lg:py-0"
+          className="sticky top-0 z-20 -mt-2 min-w-0 bg-slate-100 py-2 lg:static lg:z-auto lg:mt-0 lg:py-0"
         >
           <AdminNav
             badges={{
