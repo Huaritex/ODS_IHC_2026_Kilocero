@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api-client";
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,41 +29,34 @@ export default function RegistroPage() {
     setError(null);
     setLoading(true);
 
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rol,
-          nombre,
-          email,
-          password,
-          telefono,
-          mercado,
-          puesto,
-          organizacion,
-          direccion,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "No pudimos crear tu cuenta.");
-        setLoading(false);
-        return;
-      }
-
-      notify(
-        rol === "RECEPTOR"
-          ? "Cuenta creada. Queda pendiente de verificación por el Admin."
-          : "¡Cuenta lista! Ya podés publicar excedentes.",
-        "success"
-      );
-      router.push(data.redirectTo);
-      router.refresh();
-    } catch {
-      setError("Error de red. Verificá tu conexión.");
+    const r = await api<{ redirectTo: string }>("/api/auth/register", {
+      method: "POST",
+      json: {
+        rol,
+        nombre,
+        email,
+        password,
+        telefono,
+        mercado,
+        puesto,
+        organizacion,
+        direccion,
+      },
+    });
+    if (!r.ok || !r.data) {
+      setError(r.error || "No pudimos crear tu cuenta.");
       setLoading(false);
+      return;
     }
+
+    notify(
+      rol === "RECEPTOR"
+        ? "Cuenta creada. Queda pendiente de verificación por el Admin."
+        : "¡Cuenta lista! Ya podés publicar excedentes.",
+      "success"
+    );
+    router.push(r.data.redirectTo);
+    router.refresh();
   }
 
   return (

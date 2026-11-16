@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api-client";
 import { lugarPublicacion } from "@/lib/lugar";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -62,15 +63,9 @@ export default function ReceptorReservasPage() {
   const [showEncuesta, setShowEncuesta] = useState(false);
 
   const cargar = useCallback(async () => {
-    try {
-      const res = await fetch("/api/reservas", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setReservas(data.reservas || []);
-      }
-    } finally {
-      setLoading(false);
-    }
+    const r = await api<{ reservas: ReservaItem[] }>("/api/reservas");
+    if (r.ok && r.data) setReservas(r.data.reservas || []);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -79,48 +74,39 @@ export default function ReceptorReservasPage() {
 
   async function confirmarRetiro(id: string) {
     setActionId(id);
-    try {
-      const res = await fetch(`/api/reservas/${id}/confirmar`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        notify(data.error || "No se pudo confirmar.", "error");
-        return;
-      }
-      notify(
-        data.ambosConfirmaron
-          ? "¡Entrega completada y cerrada por ambas partes!"
-          : "Retiro confirmado. Falta que el comerciante confirme.",
-        "success"
-      );
-      setShowEncuesta(true);
-      await cargar();
-    } finally {
-      setActionId(null);
+    const r = await api<{ ambosConfirmaron?: boolean }>(
+      `/api/reservas/${id}/confirmar`,
+      { method: "POST" }
+    );
+    setActionId(null);
+    if (!r.ok || !r.data) {
+      notify(r.error || "No se pudo confirmar.", "error");
+      return;
     }
+    notify(
+      r.data.ambosConfirmaron
+        ? "¡Entrega completada y cerrada por ambas partes!"
+        : "Retiro confirmado. Falta que el comerciante confirme.",
+      "success"
+    );
+    setShowEncuesta(true);
+    await cargar();
   }
 
   async function cancelarReserva() {
     if (!cancelTargetId) return;
     setActionId(cancelTargetId);
-    try {
-      const res = await fetch(`/api/reservas/${cancelTargetId}/cancelar`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        notify("No se pudo cancelar la reserva.", "error");
-        return;
-      }
-      notify(
-        "Reserva cancelada. El excedente volvió a estar disponible.",
-        "info"
-      );
-      setCancelTargetId(null);
-      await cargar();
-    } finally {
-      setActionId(null);
+    const r = await api(`/api/reservas/${cancelTargetId}/cancelar`, {
+      method: "POST",
+    });
+    setActionId(null);
+    if (!r.ok) {
+      notify(r.error || "No se pudo cancelar la reserva.", "error");
+      return;
     }
+    notify("Reserva cancelada. El excedente volvió a estar disponible.", "info");
+    setCancelTargetId(null);
+    await cargar();
   }
 
   return (

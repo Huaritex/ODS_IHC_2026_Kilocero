@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api-client";
 import { lugarPublicacion } from "@/lib/lugar";
 import { formatHora } from "@/lib/formato";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -119,17 +120,13 @@ export default function ReceptorExplorarPage() {
   const cargar = useCallback(async (cat: CategoriaAlimento | "TODAS") => {
     setLoading(true);
     setError(null);
-    try {
-      const qs = cat === "TODAS" ? "" : `?categoria=${cat}`;
-      const res = await fetch(`/api/publicaciones${qs}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Error");
-      const data = await res.json();
-      setPublicaciones(data.publicaciones || []);
-    } catch {
-      setError("No pudimos cargar los excedentes disponibles.");
-    } finally {
-      setLoading(false);
-    }
+    const qs = cat === "TODAS" ? "" : `?categoria=${cat}`;
+    const r = await api<{ publicaciones: PublicacionDisponible[] }>(
+      `/api/publicaciones${qs}`
+    );
+    if (r.ok && r.data) setPublicaciones(r.data.publicaciones || []);
+    else setError("No pudimos cargar los excedentes disponibles.");
+    setLoading(false);
   }, []);
 
   useEffect(() => {

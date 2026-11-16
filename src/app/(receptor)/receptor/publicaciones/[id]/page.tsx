@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api-client";
 import { lugarPublicacion } from "@/lib/lugar";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -67,18 +68,17 @@ export default function ReceptorPublicacionDetallePage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/publicaciones/${params.id}`, { cache: "no-store" }).then((r) =>
-        r.ok ? r.json() : null
-      ),
-      fetch("/api/auth/me", { cache: "no-store" }).then((r) =>
-        r.ok ? r.json() : null
-      ),
+      api<{ publicacion: PublicacionDetalle }>(`/api/publicaciones/${params.id}`),
+      api<{
+        user?: { estadoVerificacion?: EstadoVerificacion; motivoRechazo?: string | null };
+      }>("/api/auth/me"),
     ])
-      .then(([pubData, meData]) => {
-        setPub(pubData?.publicacion || null);
-        if (meData?.user?.estadoVerificacion) {
-          setEstadoCuenta(meData.user.estadoVerificacion);
-          setMotivoRechazo(meData.user.motivoRechazo || null);
+      .then(([pubRes, meRes]) => {
+        setPub(pubRes.data?.publicacion || null);
+        const u = meRes.data?.user;
+        if (u?.estadoVerificacion) {
+          setEstadoCuenta(u.estadoVerificacion);
+          setMotivoRechazo(u.motivoRechazo || null);
         }
       })
       .finally(() => setLoading(false));
@@ -87,57 +87,43 @@ export default function ReceptorPublicacionDetallePage() {
   async function handleReservar() {
     if (!pub || estadoCuenta !== "VERIFICADO") return;
     setReserving(true);
-    try {
-      const res = await fetch("/api/reservas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicacionId: pub.id,
-          ventanaRetiroInicio: pub.ventanaInicio,
-          ventanaRetiroFin: pub.ventanaFin,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        notify(data.error || "No se pudo reservar.", "error");
-        setReserving(false);
-        return;
-      }
-      notify(
-        "¡Reserva confirmada! Pasá a retirar dentro del horario.",
-        "success"
-      );
-      router.push("/receptor/reservas");
-      router.refresh();
-    } catch {
-      notify("Error de conexión al reservar.", "error");
+    const r = await api("/api/reservas", {
+      method: "POST",
+      json: {
+        publicacionId: pub.id,
+        ventanaRetiroInicio: pub.ventanaInicio,
+        ventanaRetiroFin: pub.ventanaFin,
+      },
+    });
+    if (!r.ok) {
+      notify(r.error || "No se pudo reservar.", "error");
       setReserving(false);
+      return;
     }
+    notify("¡Reserva confirmada! Pasá a retirar dentro del horario.", "success");
+    router.push("/receptor/reservas");
+    router.refresh();
   }
 
   async function handleReportar(e: React.FormEvent) {
     e.preventDefault();
     if (!pub) return;
     setReporting(true);
-    try {
-      const res = await fetch(`/api/publicaciones/${pub.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          accion: "REPORTAR",
-          motivo: motivoReporte || "Producto con problema reportado",
-        }),
-      });
-      if (!res.ok) {
-        notify("No se pudo enviar el reporte.", "error");
-        return;
-      }
-      notify("Reporte enviado al equipo administrador.", "info");
-      setShowReport(false);
-      setMotivoReporte("");
-    } finally {
-      setReporting(false);
+    const r = await api(`/api/publicaciones/${pub.id}`, {
+      method: "PATCH",
+      json: {
+        accion: "REPORTAR",
+        motivo: motivoReporte || "Producto con problema reportado",
+      },
+    });
+    setReporting(false);
+    if (!r.ok) {
+      notify(r.error || "No se pudo enviar el reporte.", "error");
+      return;
     }
+    notify("Reporte enviado al equipo administrador.", "info");
+    setShowReport(false);
+    setMotivoReporte("");
   }
 
   if (loading) {

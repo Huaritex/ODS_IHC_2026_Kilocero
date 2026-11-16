@@ -1,5 +1,6 @@
 "use client";
 
+import { api } from "@/lib/api-client";
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -38,30 +39,24 @@ export default function LoginPage() {
   async function submitLogin(targetEmail: string, targetPassword: string) {
     setError(null);
     setLoading(true);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: targetEmail, password: targetPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "No pudimos iniciar sesión.");
-        setLoading(false);
-        return;
-      }
-      notify(`Bienvenido/a, ${data.user.nombre}`, "success");
-      const next = new URLSearchParams(window.location.search).get("next");
-      const destino =
-        next && next.startsWith(data.redirectTo) && !next.startsWith("//")
-          ? next
-          : data.redirectTo;
-      router.push(destino);
-      router.refresh();
-    } catch {
-      setError("Error de red. Verificá tu conexión.");
+    const r = await api<{ user: { nombre: string }; redirectTo: string }>(
+      "/api/auth/login",
+      { method: "POST", json: { email: targetEmail, password: targetPassword } }
+    );
+    if (!r.ok || !r.data) {
+      setError(r.error || "No pudimos iniciar sesión.");
       setLoading(false);
+      return;
     }
+    const { user, redirectTo } = r.data;
+    notify(`Bienvenido/a, ${user.nombre}`, "success");
+    const next = new URLSearchParams(window.location.search).get("next");
+    const destino =
+      next && next.startsWith(redirectTo) && !next.startsWith("//")
+        ? next
+        : redirectTo;
+    router.push(destino);
+    router.refresh();
   }
 
   function handleSubmit(e: React.FormEvent) {
