@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { limpiarPublicacion } from "@/lib/privacidad";
+import { guardarFoto } from "@/lib/fotos";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import type { CantidadAproximada, CategoriaAlimento } from "@/lib/types";
 import {
   CANTIDADES_APROXIMADAS,
@@ -74,7 +76,9 @@ export async function GET(req: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ publicaciones });
+    return NextResponse.json({
+      publicaciones: publicaciones.map((p) => limpiarPublicacion(p, session)),
+    });
   } catch (error) {
     console.error("Error en GET /api/publicaciones:", error);
     return NextResponse.json(
@@ -101,10 +105,16 @@ export async function POST(req: Request) {
       | undefined;
     const descripcion =
       typeof body.descripcion === "string" ? body.descripcion.trim().slice(0, 140) : null;
-    const fotoUrl =
-      typeof body.fotoUrl === "string" && body.fotoUrl.trim().length > 0
-        ? body.fotoUrl.trim()
-        : null;
+    let fotoUrl: string | null = null;
+    if (typeof body.fotoUrl === "string" && body.fotoUrl.trim().length > 0) {
+      fotoUrl = await guardarFoto(body.fotoUrl.trim());
+      if (!fotoUrl) {
+        return NextResponse.json(
+          { error: "La foto no es válida (JPG, PNG o WebP, máx. 600 KB)." },
+          { status: 400 }
+        );
+      }
+    }
     const mercado =
       typeof body.mercado === "string" ? body.mercado.trim() : "Mercado Abasto";
     const direccionTexto =

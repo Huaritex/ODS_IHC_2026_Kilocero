@@ -16,6 +16,12 @@ export interface MapaPublicacionPoint {
   ventanaFin: string;
 }
 
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!
+  );
+}
+
 export default function MapaExcedentes({
   publicaciones,
   onSelect,
@@ -80,8 +86,8 @@ export default function MapaExcedentes({
       popupEl.style.minWidth = "190px";
       popupEl.innerHTML = `
         <p style="margin:0;font-weight:800;font-size:14px;color:#020617;">${cat.emoji} ${cat.label} · ${cant.label}</p>
-        <p style="margin:4px 0 0;font-size:12px;font-weight:700;color:#0f172a;">${pub.mercado}</p>
-        <p style="margin:2px 0 0;font-size:12px;color:#334155;">${pub.direccionTexto}</p>
+        <p style="margin:4px 0 0;font-size:12px;font-weight:700;color:#0f172a;">${esc(pub.mercado)}</p>
+        <p style="margin:2px 0 0;font-size:12px;color:#334155;">${esc(pub.direccionTexto)}</p>
         <p style="margin:4px 0 8px;font-size:12px;font-weight:700;color:#065f46;">Hasta las ${horaFin}</p>
       `;
 

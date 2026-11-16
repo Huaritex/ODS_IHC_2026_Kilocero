@@ -7,3 +7,12 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 prisma/dev.db*
+src/generated/
+uploads/
+
+# JetBrains / WebStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/

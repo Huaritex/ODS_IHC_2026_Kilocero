@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { SESSION_COOKIE_NAME, signSessionToken } from "@/lib/auth";
 import { ROL_HOME } from "@/lib/constants";
+import { bloqueado, limpiar, registrarFallo } from "@/lib/rate-limit";
 import type { EstadoVerificacion, Rol } from "@/lib/types";
 
 export async function POST(req: Request) {
@@ -18,8 +19,19 @@ export async function POST(req: Request) {
       );
     }
 
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "local";
+    const clave = `${ip}|${email}`;
+    const espera = bloqueado(clave);
+    if (espera > 0) {
+      return NextResponse.json(
+        { error: `Demasiados intentos. Probá de nuevo en ${espera} min.` },
+        { status: 429 }
+      );
+    }
+
     const user = await prisma.usuario.findUnique({ where: { email } });
     if (!user) {
+      registrarFallo(clave);
       return NextResponse.json(
         { error: "Correo o contraseña incorrectos." },
         { status: 401 }
@@ -28,12 +40,14 @@ export async function POST(req: Request) {
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
+      registrarFallo(clave);
       return NextResponse.json(
         { error: "Correo o contraseña incorrectos." },
         { status: 401 }
       );
     }
 
+    limpiar(clave);
     const rol = user.rol as Rol;
     const estadoVerificacion = user.estadoVerificacion as EstadoVerificacion;
 

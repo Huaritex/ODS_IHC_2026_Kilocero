@@ -15,8 +15,15 @@ export interface SessionPayload {
 }
 
 function getSecretKey(): Uint8Array {
-  const secret =
-    process.env.AUTH_SECRET || "kilo-cero-dev-secret-cambialo-en-produccion-2026";
+  const secret = process.env.AUTH_SECRET;
+  if (!secret || secret.length < 32) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("AUTH_SECRET debe definirse (mínimo 32 caracteres).");
+    }
+    return new TextEncoder().encode(
+      "kilo-cero-solo-desarrollo-no-usar-en-produccion"
+    );
+  }
   return new TextEncoder().encode(secret);
 }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { randomInt } from "crypto";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -139,7 +140,19 @@ export async function POST(req: Request) {
         throw new Error("INVALID_DATES");
       }
 
-      const codigoRetiro = `KC-${Math.floor(1000 + Math.random() * 9000)}`;
+      let codigoRetiro = "";
+      for (let i = 0; i < 20; i++) {
+        const candidato = `KC-${randomInt(1000, 10000)}`;
+        const usado = await tx.reserva.findFirst({
+          where: { codigoRetiro: candidato, estado: "ACTIVA" },
+          select: { id: true },
+        });
+        if (!usado) {
+          codigoRetiro = candidato;
+          break;
+        }
+      }
+      if (!codigoRetiro) throw new Error("NOT_AVAILABLE");
 
       const reserva = await tx.reserva.create({
         data: {

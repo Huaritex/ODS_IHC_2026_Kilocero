@@ -25,33 +25,53 @@ const VENTANAS_RAPIDAS = [
   { id: "tarde", label: "17:30 – 19:30" },
 ];
 
-function calcularVentana(presetId: string): { inicio: Date; fin: Date } {
+function horaDe(d: Date) {
+  return d.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Reduce la foto a máx. 1024 px y JPEG ~0.7 para que pese ~100–200 KB. */
+function comprimirFoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const escala = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = () => reject(new Error("img"));
+    img.src = url;
+  });
+}
+
+/** Ventana real de un preset, o null si ese horario ya pasó. */
+function calcularVentana(presetId: string): { inicio: Date; fin: Date } | null {
   const now = new Date();
   if (presetId === "cierre") {
-    const inicio = new Date(now);
     const fin = new Date(now);
     fin.setHours(19, 0, 0, 0);
-    if (fin > now) return { inicio, fin };
+    return fin > now ? { inicio: now, fin } : null;
   }
   if (presetId === "tarde") {
     const inicio = new Date(now);
     inicio.setHours(17, 30, 0, 0);
     const fin = new Date(now);
     fin.setHours(19, 30, 0, 0);
-    if (fin > now) return { inicio, fin };
+    return fin > now ? { inicio: inicio > now ? inicio : now, fin } : null;
   }
-  return {
-    inicio: now,
-    fin: new Date(now.getTime() + 2 * 60 * 60 * 1000),
-  };
+  return { inicio: now, fin: new Date(now.getTime() + 2 * 60 * 60 * 1000) };
 }
 
 export default function PublicarExcedentePage() {
   const router = useRouter();
   const { notify } = useToast();
 
-  const [categoria, setCategoria] = useState<CategoriaAlimento>("VERDURAS");
-  const [cantidad, setCantidad] = useState<CantidadAproximada>("MEDIO");
+  const [categoria, setCategoria] = useState<CategoriaAlimento | null>(null);
+  const [cantidad, setCantidad] = useState<CantidadAproximada | null>(null);
   const [mercado, setMercado] = useState(MERCADOS_SANTA_CRUZ[0].nombre);
   const [direccionTexto, setDireccionTexto] = useState(
     `${MERCADOS_SANTA_CRUZ[0].nombre} - Mi puesto`
@@ -107,23 +127,21 @@ export default function PublicarExcedentePage() {
   function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 1_500_000) {
-      notify("La foto es muy pesada (máx. 1.5 MB).", "error");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setFotoUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    comprimirFoto(file)
+      .then(setFotoUrl)
+      .catch(() => notify("No pudimos leer esa foto. Probá con otra.", "error"));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!categoria || !cantidad) return;
+    const ventana = calcularVentana(ventanaId);
+    if (!ventana) {
+      notify("Ese horario ya pasó. Elegí otra ventana de retiro.", "error");
+      return;
+    }
     setSubmitting(true);
-    const { inicio, fin } = calcularVentana(ventanaId);
+    const { inicio, fin } = ventana;
 
     const payload = {
       categoria,
@@ -207,18 +225,20 @@ export default function PublicarExcedentePage() {
     }
   }
 
-  const ventanaActual =
-    VENTANAS_RAPIDAS.find((v) => v.id === ventanaId)?.label ||
-    "Próximas 2 horas";
+  const ventanaReal = calcularVentana(ventanaId);
+  const ventanaActual = ventanaReal
+    ? `${horaDe(ventanaReal.inicio)} – ${horaDe(ventanaReal.fin)}`
+    : "horario vencido";
+  const listo = categoria !== null && cantidad !== null;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 pb-24">
       <div>
         <h2 className="text-xl font-black text-slate-950">
-          Publicar en 3 toques
+          Publicar en 4 toques
         </h2>
         <p className="text-xs font-bold text-slate-700">
-          Elegí alimento, cantidad y tocá Publicar abajo.
+          Elegí alimento, cantidad y hasta cuándo; luego tocá Publicar.
         </p>
       </div>
 
@@ -284,7 +304,39 @@ export default function PublicarExcedentePage() {
         </div>
       </fieldset>
 
-      {/* 3. Resumen fijo (no dispara teclado al scrollear) */}
+      {/* 3. Ventana de retiro (siempre visible: es un dato clave) */}
+      <fieldset>
+        <legend className="text-sm font-black uppercase tracking-wide text-slate-950">
+          3. ¿Hasta cuándo pueden retirar?
+        </legend>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {VENTANAS_RAPIDAS.map((v) => {
+            const real = calcularVentana(v.id);
+            const selected = ventanaId === v.id;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                aria-pressed={selected}
+                disabled={!real}
+                onClick={() => setVentanaId(v.id)}
+                className={`flex min-h-[56px] flex-col items-center justify-center rounded-2xl border-2 p-2 text-center disabled:cursor-not-allowed disabled:opacity-50 ${
+                  selected
+                    ? "border-emerald-950 bg-emerald-100 text-emerald-950"
+                    : "border-slate-300 bg-white text-slate-900 hover:border-slate-600"
+                }`}
+              >
+                <span className="text-sm font-black">{v.label}</span>
+                <span className="text-[11px] font-bold text-slate-700">
+                  {real ? `${horaDe(real.inicio)} – ${horaDe(real.fin)}` : "ya pasó"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
+      {/* 4. Resumen fijo (no dispara teclado al scrollear) */}
       <div className="rounded-2xl border-2 border-slate-900 bg-white p-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1 text-xs font-bold text-slate-800">
@@ -294,7 +346,7 @@ export default function PublicarExcedentePage() {
             </p>
             <p className="flex items-center gap-1.5 text-emerald-900">
               <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>Retiro: {ventanaActual}</span>
+              <span>Retiro hoy: {ventanaActual}</span>
             </p>
           </div>
           <button
@@ -313,23 +365,6 @@ export default function PublicarExcedentePage() {
 
         {mostrarPuesto && (
           <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
-            <div className="flex flex-wrap gap-2">
-              {VENTANAS_RAPIDAS.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  aria-pressed={ventanaId === v.id}
-                  onClick={() => setVentanaId(v.id)}
-                  className={`min-h-[48px] rounded-xl border-2 px-3 text-xs font-extrabold ${
-                    ventanaId === v.id
-                      ? "border-slate-950 bg-slate-900 text-white"
-                      : "border-slate-300 bg-slate-50 text-slate-900"
-                  }`}
-                >
-                  {v.label}
-                </button>
-              ))}
-            </div>
             <div>
               <label
                 htmlFor="pub-mercado"
@@ -419,11 +454,17 @@ export default function PublicarExcedentePage() {
         <div className="mx-auto max-w-lg">
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !listo}
             className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-950 bg-emerald-800 px-6 text-lg font-black text-white shadow-xl hover:bg-emerald-900 disabled:opacity-60"
           >
             <Send className="h-5 w-5" aria-hidden="true" />
-            <span>{submitting ? "Publicando..." : "PUBLICAR EXCEDENTE"}</span>
+            <span>
+              {submitting
+                ? "Publicando..."
+                : listo
+                  ? "PUBLICAR EXCEDENTE"
+                  : "Elegí alimento y cantidad"}
+            </span>
           </button>
         </div>
       </div>

@@ -51,7 +51,12 @@ export default function LoginPage() {
         return;
       }
       notify(`Bienvenido/a, ${data.user.nombre}`, "success");
-      router.push(data.redirectTo);
+      const next = new URLSearchParams(window.location.search).get("next");
+      const destino =
+        next && next.startsWith(data.redirectTo) && !next.startsWith("//")
+          ? next
+          : data.redirectTo;
+      router.push(destino);
       router.refresh();
     } catch {
       setError("Error de red. Verificá tu conexión.");
@@ -138,6 +143,7 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {process.env.NEXT_PUBLIC_DEMO !== "false" && (
         <div className="mt-7 border-t-2 border-slate-200 pt-5">
           <p className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
             Acceso rápido para demo (clave: kilocero2026)
@@ -165,6 +171,7 @@ export default function LoginPage() {
             })}
           </div>
         </div>
+        )}
 
         <p className="mt-6 text-center text-sm text-slate-800">
           ¿No tenés cuenta?{" "}

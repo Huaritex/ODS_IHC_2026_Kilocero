@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { limpiarPublicacion } from "@/lib/privacidad";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
@@ -49,17 +50,8 @@ export async function GET(
       );
     }
 
-    const isOwner =
-      session.rol === "COMERCIANTE" &&
-      publicacion.comercianteId === session.userId;
-
-    const visibleReservas =
-      session.rol === "ADMIN" || isOwner
-        ? publicacion.reservas
-        : publicacion.reservas.filter((r) => r.receptor.id === session.userId);
-
     return NextResponse.json({
-      publicacion: { ...publicacion, reservas: visibleReservas },
+      publicacion: limpiarPublicacion(publicacion, session),
     });
   } catch (error) {
     console.error("Error en GET /api/publicaciones/[id]:", error);
