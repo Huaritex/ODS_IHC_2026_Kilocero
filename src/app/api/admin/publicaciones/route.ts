@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { expirarVencidas } from "@/lib/expiracion";
 
 export async function GET() {
   const session = await getSession();
@@ -8,6 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
+  await expirarVencidas();
   const publicaciones = await prisma.publicacion.findMany({
     include: {
       comerciante: {

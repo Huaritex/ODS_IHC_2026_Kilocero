@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { cancelarReservasActivas, registrarAuditoria } from "@/lib/admin-acciones";
 
 export async function PATCH(
   req: Request,
@@ -28,9 +29,25 @@ export async function PATCH(
     }
 
     if (accion === "OCULTAR") {
-      const updated = await prisma.publicacion.update({
-        where: { id },
-        data: { ocultaPorAdmin: true },
+      const updated = await prisma.$transaction(async (tx) => {
+        const canceladas = await cancelarReservasActivas(
+          tx,
+          { publicacionId: id },
+          "El administrador ocultó esta publicación por moderación."
+        );
+        const pub = await tx.publicacion.update({
+          where: { id },
+          data: { ocultaPorAdmin: true },
+        });
+        await registrarAuditoria(
+          session,
+          "PUBLICACION_OCULTADA",
+          "PUBLICACION",
+          id,
+          canceladas > 0 ? `${canceladas} reserva(s) cancelada(s)` : null,
+          tx
+        );
+        return pub;
       });
       return NextResponse.json({ publicacion: updated });
     }
@@ -40,6 +57,7 @@ export async function PATCH(
         where: { id },
         data: { ocultaPorAdmin: false, reportada: false, motivoReporte: null },
       });
+      await registrarAuditoria(session, "PUBLICACION_RESTAURADA", "PUBLICACION", id);
       return NextResponse.json({ publicacion: updated });
     }
 
@@ -48,6 +66,7 @@ export async function PATCH(
         where: { id },
         data: { reportada: false, motivoReporte: null },
       });
+      await registrarAuditoria(session, "REPORTE_DESCARTADO", "PUBLICACION", id);
       return NextResponse.json({ publicacion: updated });
     }
 

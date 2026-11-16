@@ -29,14 +29,15 @@ export default async function ReceptorLayout({
     session.estadoVerificacion) as EstadoVerificacion;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="min-h-screen bg-slate-50 pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <RoleHeader
         title={user?.organizacion || session.nombre}
         subtitle={`Responsable: ${user?.nombre || session.nombre}`}
         rolLabel="Receptor / ONG"
+        maxWidthClass="max-w-2xl lg:max-w-4xl"
       />
 
-      <main className="mx-auto max-w-2xl px-4 py-5">
+      <main className="mx-auto max-w-2xl lg:max-w-4xl px-4 py-5">
         {estado !== "VERIFICADO" && (
           <div
             role="alert"
@@ -60,9 +61,9 @@ export default async function ReceptorLayout({
 
       <nav
         aria-label="Navegación de receptor"
-        className="fixed right-0 bottom-0 left-0 z-40 border-t-2 border-slate-900 bg-white px-3 py-2 shadow-lg"
+        className="fixed right-0 bottom-0 left-0 z-40 border-t-2 border-slate-900 bg-white px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg"
       >
-        <div className="mx-auto flex max-w-2xl items-center gap-3">
+        <div className="mx-auto flex max-w-2xl lg:max-w-4xl items-center gap-3">
           <Link
             href="/receptor"
             className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-xl bg-sky-900 px-3 text-base font-extrabold text-white hover:bg-sky-950"

@@ -8,22 +8,31 @@ interface RoleHeaderProps {
   title: string;
   subtitle: string;
   rolLabel: string;
+  maxWidthClass?: string;
 }
 
-export function RoleHeader({ title, subtitle, rolLabel }: RoleHeaderProps) {
+export function RoleHeader({
+  title,
+  subtitle,
+  rolLabel,
+  maxWidthClass = "max-w-5xl",
+}: RoleHeaderProps) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.push("/login");
+      router.refresh();
+    }
   }
 
   return (
     <header className="border-b-2 border-slate-900 bg-white px-4 py-3">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+      <div className={`mx-auto flex ${maxWidthClass} items-center justify-between gap-3`}>
         <div className="min-w-0">
           <span className="inline-block rounded-md bg-slate-900 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">
             {rolLabel}

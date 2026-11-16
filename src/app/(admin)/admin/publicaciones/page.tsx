@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { EyeOff, RotateCcw, Flag, CheckCircle2 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { EyeOff, RotateCcw, Flag, CheckCircle2, RefreshCw } from "lucide-react";
 import type {
   CantidadAproximada,
   CategoriaAlimento,
@@ -33,16 +33,20 @@ export default function AdminPublicacionesPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [hideTarget, setHideTarget] = useState<AdminPubRow | null>(null);
+  const [error, setError] = useState(false);
+  const [filtro, setFiltro] = useState<"REPORTADAS" | "OCULTAS" | "TODAS">("TODAS");
 
   const cargar = useCallback(async () => {
+    setError(false);
     try {
       const res = await fetch("/api/admin/publicaciones", {
         cache: "no-store",
       });
-      if (res.ok) {
-        const data = await res.json();
-        setPublicaciones(data.publicaciones || []);
-      }
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setPublicaciones(data.publicaciones || []);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -50,7 +54,25 @@ export default function AdminPublicacionesPage() {
 
   useEffect(() => {
     cargar();
+    const q = new URLSearchParams(window.location.search).get("filtro");
+    if (q === "reportadas") setFiltro("REPORTADAS");
+    if (q === "ocultas") setFiltro("OCULTAS");
   }, [cargar]);
+
+  const conteo = useMemo(
+    () => ({
+      REPORTADAS: publicaciones.filter((p) => p.reportada && !p.ocultaPorAdmin).length,
+      OCULTAS: publicaciones.filter((p) => p.ocultaPorAdmin).length,
+      TODAS: publicaciones.length,
+    }),
+    [publicaciones]
+  );
+  const visibles = useMemo(() => {
+    if (filtro === "REPORTADAS")
+      return publicaciones.filter((p) => p.reportada && !p.ocultaPorAdmin);
+    if (filtro === "OCULTAS") return publicaciones.filter((p) => p.ocultaPorAdmin);
+    return publicaciones;
+  }, [publicaciones, filtro]);
 
   async function moderar(
     id: string,
@@ -91,18 +113,66 @@ export default function AdminPublicacionesPage() {
         </p>
       </div>
 
+      <div
+        role="group"
+        aria-label="Filtrar publicaciones"
+        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0"
+      >
+        {(
+          [
+            ["REPORTADAS", "Reportadas"],
+            ["OCULTAS", "Ocultas"],
+            ["TODAS", "Todas"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={filtro === key}
+            onClick={() => setFiltro(key)}
+            className={`min-h-[48px] shrink-0 rounded-xl border-2 px-4 text-sm font-extrabold ${
+              filtro === key
+                ? "border-slate-950 bg-slate-900 text-white"
+                : "border-slate-900 bg-white text-slate-950 hover:bg-slate-100"
+            }`}
+          >
+            {label} ({conteo[key]})
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-rose-800 bg-rose-50 p-4 text-sm font-bold text-rose-950"
+        >
+          <span>No se pudo cargar el listado.</span>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              cargar();
+            }}
+            className="inline-flex min-h-[48px] items-center gap-1.5 rounded-xl border-2 border-rose-800 bg-white px-4 text-sm font-extrabold"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Reintentar
+          </button>
+        </div>
+      )}
+
       {/* Vista móvil en tarjetas */}
       <div className="space-y-3 md:hidden">
         {loading ? (
           <div className="rounded-2xl border-2 border-slate-900 bg-white p-5 text-center font-bold">
             Cargando publicaciones...
           </div>
-        ) : publicaciones.length === 0 ? (
+        ) : visibles.length === 0 ? (
           <div className="rounded-2xl border-2 border-slate-900 bg-white p-5 text-center font-bold">
-            No hay publicaciones registradas.
+            No hay publicaciones en esta vista.
           </div>
         ) : (
-          publicaciones.map((p) => {
+          visibles.map((p) => {
             const cat = CATEGORIA_MAP[p.categoria];
             const cant = CANTIDAD_MAP[p.cantidadAproximada];
             const labelResumen = `${cat.label} de ${p.comerciante.nombre}`;
@@ -215,14 +285,14 @@ export default function AdminPublicacionesPage() {
                   Cargando publicaciones...
                 </td>
               </tr>
-            ) : publicaciones.length === 0 ? (
+            ) : visibles.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center font-bold">
-                  No hay publicaciones registradas.
+                  No hay publicaciones en esta vista.
                 </td>
               </tr>
             ) : (
-              publicaciones.map((p) => {
+              visibles.map((p) => {
                 const cat = CATEGORIA_MAP[p.categoria];
                 const cant = CANTIDAD_MAP[p.cantidadAproximada];
                 const labelResumen = `${cat.label} de ${p.comerciante.nombre}`;

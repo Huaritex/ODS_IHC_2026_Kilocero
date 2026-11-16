@@ -232,7 +232,7 @@ export default function PublicarExcedentePage() {
   const listo = categoria !== null && cantidad !== null;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pb-24">
+    <form onSubmit={handleSubmit} className="space-y-4 pb-32">
       <div>
         <h2 className="text-xl font-black text-slate-950">
           Publicar en 4 toques
@@ -450,8 +450,8 @@ export default function PublicarExcedentePage() {
       </div>
 
       {/* CTA Sticky en la zona del pulgar por encima de la nav inferior */}
-      <div className="fixed right-0 bottom-[70px] left-0 z-30 px-4">
-        <div className="mx-auto max-w-lg">
+      <div className="fixed right-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 z-30 px-4">
+        <div className="mx-auto max-w-lg md:max-w-2xl">
           <button
             type="submit"
             disabled={submitting || !listo}

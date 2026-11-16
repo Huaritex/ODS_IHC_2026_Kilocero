@@ -25,6 +25,7 @@ interface ReservaItem {
   id: string;
   codigoRetiro: string | null;
   estado: "ACTIVA" | "COMPLETADA" | "CANCELADA" | "EXPIRADA";
+  motivoCancelacion?: string | null;
   confirmadoReceptor: boolean;
   confirmadoComerciante: boolean;
   ventanaRetiroInicio: string;
@@ -168,6 +169,17 @@ export default function ReceptorReservasPage() {
                   </div>
                   <EstadoPublicacionBadge estado={r.publicacion.estado} />
                 </div>
+
+                {(r.estado === "CANCELADA" || r.estado === "EXPIRADA") &&
+                  r.motivoCancelacion && (
+                    <p
+                      role="status"
+                      className="mt-3 rounded-xl border-2 border-rose-800 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-950"
+                    >
+                      Reserva {r.estado === "CANCELADA" ? "cancelada" : "vencida"}
+                      : {r.motivoCancelacion}
+                    </p>
+                  )}
 
                 {r.codigoRetiro && r.estado === "ACTIVA" && (
                   <div className="mt-3 rounded-xl border-2 border-slate-900 bg-amber-100 px-3 py-2 text-center">

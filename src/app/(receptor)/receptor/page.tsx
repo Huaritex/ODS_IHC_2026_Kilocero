@@ -17,7 +17,7 @@ import {
 const MapaExcedentes = dynamic(() => import("@/components/MapaExcedentes"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[380px] items-center justify-center rounded-2xl border-2 border-slate-900 bg-slate-200 font-bold text-slate-800">
+    <div className="flex h-[300px] items-center sm:h-[380px] lg:h-[480px] justify-center rounded-2xl border-2 border-slate-900 bg-slate-200 font-bold text-slate-800">
       Cargando mapa de Santa Cruz...
     </div>
   ),

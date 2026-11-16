@@ -16,3 +16,6 @@ uploads/
 *.iws
 *.ipr
 .idea_modules/
+
+# Script local de commit
+commit.sh

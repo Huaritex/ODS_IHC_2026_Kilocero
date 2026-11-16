@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { expirarVencidas } from "@/lib/expiracion";
 import { CANTIDAD_MAP, KG_POR_COMIDA } from "@/lib/constants";
 import type { CantidadAproximada } from "@/lib/types";
 import {
@@ -16,6 +17,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
+  await expirarVencidas();
   const [
     confirmadas,
     pendientesReceptores,
@@ -35,7 +37,11 @@ export default async function AdminDashboardPage() {
       where: { reportada: true, ocultaPorAdmin: false },
     }),
     prisma.publicacion.count({
-      where: { estado: "DISPONIBLE", ocultaPorAdmin: false },
+      where: {
+        estado: "DISPONIBLE",
+        ocultaPorAdmin: false,
+        ventanaFin: { gt: new Date() },
+      },
     }),
     prisma.metricaUsabilidad.findMany({
       where: { tipo: "TIEMPO_PUBLICACION" },
@@ -98,7 +104,7 @@ export default async function AdminDashboardPage() {
 
       <section
         aria-label="Indicadores principales de impacto"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <div className="rounded-2xl border-2 border-slate-900 bg-white p-5">
           <div className="flex items-center justify-between text-emerald-900">

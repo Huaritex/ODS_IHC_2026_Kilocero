@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { cancelarReservasActivas, registrarAuditoria } from "@/lib/admin-acciones";
 
 export async function PATCH(
   req: Request,
@@ -16,7 +17,9 @@ export async function PATCH(
     const body = await req.json();
     const decision = body.decision as "VERIFICADO" | "RECHAZADO" | undefined;
     const motivoRechazo =
-      typeof body.motivoRechazo === "string" ? body.motivoRechazo.trim() : null;
+      typeof body.motivoRechazo === "string"
+        ? body.motivoRechazo.trim().slice(0, 200)
+        : null;
 
     if (decision !== "VERIFICADO" && decision !== "RECHAZADO") {
       return NextResponse.json(
@@ -36,19 +39,44 @@ export async function PATCH(
       );
     }
 
-    const updated = await prisma.usuario.update({
-      where: { id },
-      data: {
-        estadoVerificacion: decision,
-        motivoRechazo: decision === "RECHAZADO" ? motivoRechazo : null,
-      },
-      select: {
-        id: true,
-        nombre: true,
-        organizacion: true,
-        estadoVerificacion: true,
-        motivoRechazo: true,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.usuario.update({
+        where: { id },
+        data: {
+          estadoVerificacion: decision,
+          motivoRechazo: decision === "RECHAZADO" ? motivoRechazo : null,
+        },
+        select: {
+          id: true,
+          nombre: true,
+          organizacion: true,
+          estadoVerificacion: true,
+          motivoRechazo: true,
+        },
+      });
+      let canceladas = 0;
+      if (decision === "RECHAZADO") {
+        canceladas = await cancelarReservasActivas(
+          tx,
+          { receptorId: id },
+          "Tu cuenta fue rechazada por el administrador."
+        );
+      }
+      await registrarAuditoria(
+        session,
+        decision === "VERIFICADO" ? "RECEPTOR_VERIFICADO" : "RECEPTOR_RECHAZADO",
+        "USUARIO",
+        id,
+        [
+          u.organizacion || u.nombre,
+          motivoRechazo,
+          canceladas > 0 ? `${canceladas} reserva(s) cancelada(s)` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        tx
+      );
+      return u;
     });
 
     return NextResponse.json({ receptor: updated });

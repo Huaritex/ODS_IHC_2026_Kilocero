@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { randomInt } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { expirarVencidas } from "@/lib/expiracion";
 
 export async function GET() {
   try {
@@ -9,6 +10,8 @@ export async function GET() {
     if (!session) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
+
+    await expirarVencidas();
 
     const where =
       session.rol === "RECEPTOR"

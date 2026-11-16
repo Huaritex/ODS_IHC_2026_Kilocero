@@ -115,7 +115,7 @@ export default function MapaExcedentes({
     <div
       ref={containerRef}
       aria-label="Mapa de excedentes en Santa Cruz de la Sierra"
-      className="h-[380px] w-full rounded-2xl border-2 border-slate-900 bg-slate-200 z-0"
+      className="h-[300px] w-full sm:h-[380px] lg:h-[480px] rounded-2xl border-2 border-slate-900 bg-slate-200 z-0"
     />
   );
 }

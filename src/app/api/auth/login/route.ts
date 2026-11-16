@@ -48,6 +48,16 @@ export async function POST(req: Request) {
     }
 
     limpiar(clave);
+    if (user.suspendido) {
+      return NextResponse.json(
+        {
+          error: `Tu cuenta está suspendida${
+            user.motivoSuspension ? `: ${user.motivoSuspension}` : "."
+          } Contactá al equipo administrador.`,
+        },
+        { status: 403 }
+      );
+    }
     const rol = user.rol as Rol;
     const estadoVerificacion = user.estadoVerificacion as EstadoVerificacion;
 

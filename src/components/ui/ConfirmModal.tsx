@@ -6,6 +6,7 @@ interface ConfirmModalProps {
   open: boolean;
   title: string;
   description: string;
+  children?: React.ReactNode;
   confirmLabel: string;
   destructive?: boolean;
   loading?: boolean;
@@ -17,6 +18,7 @@ export function ConfirmModal({
   open,
   title,
   description,
+  children,
   confirmLabel,
   destructive = true,
   loading = false,
@@ -49,7 +51,7 @@ export function ConfirmModal({
       }
       if (e.key === "Tab" && modalRef.current) {
         const focusables = modalRef.current.querySelectorAll<HTMLElement>(
-          "button:not([disabled]), [href], input:not([disabled])"
+          "button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled])"
         );
         if (focusables.length === 0) return;
         const first = focusables[0];
@@ -79,7 +81,7 @@ export function ConfirmModal({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-md rounded-2xl border-2 border-slate-900 bg-white p-6 shadow-2xl"
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border-2 border-slate-900 bg-white p-5 shadow-2xl sm:p-6"
       >
         <h2
           id="confirm-modal-title"
@@ -93,6 +95,7 @@ export function ConfirmModal({
         >
           {description}
         </p>
+        {children}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
           <button
             type="button"

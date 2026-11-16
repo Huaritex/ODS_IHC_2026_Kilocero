@@ -3,23 +3,13 @@ import { getSession } from "@/lib/auth";
 import { limpiarPublicacion } from "@/lib/privacidad";
 import { guardarFoto } from "@/lib/fotos";
 import { prisma } from "@/lib/prisma";
+import { expirarVencidas } from "@/lib/expiracion";
 import type { Prisma } from "@/generated/prisma/client";
 import type { CantidadAproximada, CategoriaAlimento } from "@/lib/types";
 import {
   CANTIDADES_APROXIMADAS,
   CATEGORIAS_ALIMENTO,
 } from "@/lib/constants";
-
-async function expirarVencidas() {
-  const now = new Date();
-  await prisma.publicacion.updateMany({
-    where: {
-      estado: "DISPONIBLE",
-      ventanaFin: { lt: now },
-    },
-    data: { estado: "EXPIRADO" },
-  });
-}
 
 export async function GET(req: Request) {
   try {
@@ -94,6 +84,20 @@ export async function POST(req: Request) {
     if (!session || session.rol !== "COMERCIANTE") {
       return NextResponse.json(
         { error: "Solo comerciantes pueden publicar excedentes." },
+        { status: 403 }
+      );
+    }
+
+    const cuenta = await prisma.usuario.findUnique({
+      where: { id: session.userId },
+      select: { suspendido: true },
+    });
+    if (cuenta?.suspendido) {
+      return NextResponse.json(
+        {
+          error:
+            "Tu cuenta está suspendida. Contactá al equipo administrador.",
+        },
         { status: 403 }
       );
     }
