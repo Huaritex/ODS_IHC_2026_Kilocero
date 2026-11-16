@@ -2,66 +2,22 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Clock,
-  CheckCircle2,
-  XCircle,
-  CloudOff,
-  RefreshCw,
-  PlusCircle,
-  Phone,
-  MessageCircle,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { api } from "@/lib/api-client";
-import { formatHora, formatWhatsappUrl } from "@/lib/formato";
-import type {
-  CantidadAproximada,
-  CategoriaAlimento,
-  EstadoPublicacion,
-} from "@/lib/types";
-import { CANTIDAD_MAP, CATEGORIA_MAP } from "@/lib/constants";
 import {
   enqueueComercianteAction,
-  fetchWithTimeout,
   flushOfflineQueue,
   getOfflineActions,
   getOfflineQueue,
   QUEUE_UPDATED_EVENT,
-  removeQueuedPublicacion,
   type QueuedComercianteAction,
   type QueuedPublicacion,
 } from "@/lib/offline-queue";
-import { EstadoPublicacionBadge } from "@/components/ui/EstadoBadge";
+import { AvisoCard, type PublicacionItem } from "@/components/comerciante/AvisoCard";
+import { ColaPendiente } from "@/components/comerciante/ColaPendiente";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { EncuestaUsabilidadModal } from "@/components/EncuestaUsabilidadModal";
 import { useToast } from "@/components/ToastProvider";
-
-interface PublicacionItem {
-  id: string;
-  categoria: CategoriaAlimento;
-  cantidadAproximada: CantidadAproximada;
-  descripcion: string | null;
-  mercado: string;
-  direccionTexto: string;
-  ventanaInicio: string;
-  ventanaFin: string;
-  estado: EstadoPublicacion;
-  reservas: Array<{
-    id: string;
-    codigoRetiro: string | null;
-    estado: string;
-    confirmadoComerciante: boolean;
-    confirmadoReceptor: boolean;
-    receptor: {
-      nombre: string;
-      organizacion: string | null;
-      telefono: string | null;
-    };
-  }>;
-}
-
 
 export default function ComercianteDashboardPage() {
   const { notify } = useToast();
@@ -80,23 +36,14 @@ export default function ComercianteDashboardPage() {
   const cargarDatos = useCallback(async () => {
     setColaLocal(getOfflineQueue());
     setAccionesLocales(getOfflineActions());
-    try {
-      setError(null);
-      const res = await fetchWithTimeout(
-        "/api/publicaciones?mine=1",
-        { cache: "no-store" },
-        6000
-      );
-      if (!res.ok) {
-        throw new Error("No se pudieron cargar tus publicaciones.");
-      }
-      const data = await res.json();
-      setPublicaciones(data.publicaciones || []);
-    } catch {
-      setError("Sin conexión con el servidor. Mostrando cola local.");
-    } finally {
-      setLoading(false);
-    }
+    setError(null);
+    const r = await api<{ publicaciones: PublicacionItem[] }>(
+      "/api/publicaciones?mine=1",
+      { timeoutMs: 6000 }
+    );
+    if (r.ok && r.data) setPublicaciones(r.data.publicaciones || []);
+    else setError("Sin conexión con el servidor. Mostrando cola local.");
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -114,6 +61,9 @@ export default function ComercianteDashboardPage() {
     };
   }, [cargarDatos]);
 
+  /** Sin señal o servidor caído: la acción se guarda en la cola local. */
+  const sinRespuesta = (status: number) => status === 0 || status >= 500;
+
   async function confirmarEntrega(reservaId: string, label: string) {
     if (!navigator.onLine) {
       enqueueComercianteAction("CONFIRMAR_ENTREGA", reservaId, label);
@@ -125,39 +75,32 @@ export default function ComercianteDashboardPage() {
     }
 
     setActionId(reservaId);
-    try {
-      const res = await fetchWithTimeout(
-        `/api/reservas/${reservaId}/confirmar`,
-        { method: "POST" },
-        6000
-      );
-      if (res.status >= 500) {
-        enqueueComercianteAction("CONFIRMAR_ENTREGA", reservaId, label);
-        notify("Servidor sin respuesta: guardado en cola para reintentar.", "info");
-        return;
-      }
-      const data = await res.json();
-      if (!res.ok) {
-        notify(data.error || "No se pudo confirmar.", "error");
-        return;
-      }
-      notify(
-        data.ambosConfirmaron
-          ? "¡Entrega confirmada por ambas partes! Gracias por rescatar alimentos."
-          : "Confirmaste la entrega. Falta que el comedor confirme.",
-        "success"
-      );
-      setShowEncuesta(true);
-      await cargarDatos();
-    } catch {
+    const r = await api<{ ambosConfirmaron?: boolean }>(
+      `/api/reservas/${reservaId}/confirmar`,
+      { method: "POST", timeoutMs: 6000 }
+    );
+    setActionId(null);
+
+    if (sinRespuesta(r.status)) {
       enqueueComercianteAction("CONFIRMAR_ENTREGA", reservaId, label);
       notify(
-        "Conexión caída: confirmación guardada como 'Pendiente de envío'.",
+        "Servidor sin respuesta: confirmación guardada como 'Pendiente de envío'.",
         "info"
       );
-    } finally {
-      setActionId(null);
+      return;
     }
+    if (!r.ok || !r.data) {
+      notify(r.error || "No se pudo confirmar.", "error");
+      return;
+    }
+    notify(
+      r.data.ambosConfirmaron
+        ? "¡Entrega confirmada por ambas partes! Gracias por rescatar alimentos."
+        : "Confirmaste la entrega. Falta que el comedor confirme.",
+      "success"
+    );
+    setShowEncuesta(true);
+    await cargarDatos();
   }
 
   async function eliminarPublicacion() {
@@ -178,56 +121,37 @@ export default function ComercianteDashboardPage() {
 
   async function cerrarPublicacion() {
     if (!confirmCloseId) return;
-    if (!navigator.onLine) {
-      enqueueComercianteAction(
-        "CERRAR_PUBLICACION",
-        confirmCloseId,
-        "Cerrar publicación"
-      );
+    const id = confirmCloseId;
+    const encolar = (mensaje: string) => {
+      enqueueComercianteAction("CERRAR_PUBLICACION", id, "Cerrar publicación");
       setConfirmCloseId(null);
-      notify("Sin señal: el cierre se enviará al volver la conexión.", "info");
+      notify(mensaje, "info");
+    };
+
+    if (!navigator.onLine) {
+      encolar("Sin señal: el cierre se enviará al volver la conexión.");
       return;
     }
 
-    setActionId(confirmCloseId);
-    try {
-      const res = await fetchWithTimeout(
-        `/api/publicaciones/${confirmCloseId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ accion: "EXPIRAR" }),
-        },
-        6000
-      );
-      if (res.status >= 500) {
-        enqueueComercianteAction(
-          "CERRAR_PUBLICACION",
-          confirmCloseId,
-          "Cerrar publicación"
-        );
-        setConfirmCloseId(null);
-        notify("Guardado en cola para cerrar al reconectar.", "info");
-        return;
-      }
-      if (!res.ok) {
-        notify("No se pudo cerrar la publicación.", "error");
-        return;
-      }
-      notify("Publicación cerrada.", "info");
-      setConfirmCloseId(null);
-      await cargarDatos();
-    } catch {
-      enqueueComercianteAction(
-        "CERRAR_PUBLICACION",
-        confirmCloseId,
-        "Cerrar publicación"
-      );
-      setConfirmCloseId(null);
-      notify("Sin señal: cierre guardado en cola local.", "info");
-    } finally {
-      setActionId(null);
+    setActionId(id);
+    const r = await api(`/api/publicaciones/${id}`, {
+      method: "PATCH",
+      json: { accion: "EXPIRAR" },
+      timeoutMs: 6000,
+    });
+    setActionId(null);
+
+    if (sinRespuesta(r.status)) {
+      encolar("Sin respuesta del servidor: cierre guardado en cola local.");
+      return;
     }
+    if (!r.ok) {
+      notify(r.error || "No se pudo cerrar la publicación.", "error");
+      return;
+    }
+    notify("Publicación cerrada.", "info");
+    setConfirmCloseId(null);
+    await cargarDatos();
   }
 
   async function reintentarCola() {
@@ -245,71 +169,12 @@ export default function ComercianteDashboardPage() {
   return (
     <div className="space-y-5">
       {totalPendiente > 0 && (
-        <section
-          aria-label="Operaciones pendientes de envío"
-          className="rounded-2xl border-2 border-amber-700 bg-amber-50 p-4"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-amber-950">
-              <CloudOff className="h-5 w-5 shrink-0" aria-hidden="true" />
-              <h2 className="text-base font-black">
-                Pendiente de envío ({totalPendiente})
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={reintentarCola}
-              className="flex min-h-[48px] items-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white px-3 text-sm font-extrabold text-slate-950 hover:bg-slate-100"
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              <span>Reintentar</span>
-            </button>
-          </div>
-          <p className="mt-1 text-sm font-medium text-amber-950">
-            Se enviarán automáticamente cuando vuelva la conexión.
-          </p>
-          <ul className="mt-3 space-y-2">
-            {colaLocal.map((item) => {
-              const cat = CATEGORIA_MAP[item.categoria];
-              const cant = CANTIDAD_MAP[item.cantidadAproximada];
-              return (
-                <li
-                  key={item.localId}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-amber-700 bg-white p-3"
-                >
-                  <div>
-                    <p className="text-sm font-extrabold text-slate-950">
-                      {cat.emoji} {cat.label} · {cant.label}
-                    </p>
-                    <p className="text-xs font-semibold text-amber-900">
-                      ◷ Pendiente de envío · {item.direccionTexto}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeQueuedPublicacion(item.localId)}
-                    className="min-h-[48px] rounded-lg px-3 text-xs font-bold text-rose-800 underline"
-                  >
-                    Descartar
-                  </button>
-                </li>
-              );
-            })}
-            {accionesLocales.map((act) => (
-              <li
-                key={act.localId}
-                className="rounded-xl border border-amber-700 bg-white p-3"
-              >
-                <p className="text-sm font-extrabold text-slate-950">
-                  {act.label}
-                </p>
-                <p className="text-xs font-semibold text-amber-900">
-                  ◷ Pendiente de sincronizar al volver la señal
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <ColaPendiente
+          total={totalPendiente}
+          cola={colaLocal}
+          acciones={accionesLocales}
+          onRetry={reintentarCola}
+        />
       )}
 
       <div className="flex items-center justify-between">
@@ -357,166 +222,17 @@ export default function ComercianteDashboardPage() {
       )}
 
       <ul className="space-y-4">
-        {publicaciones.map((pub) => {
-          const cat = CATEGORIA_MAP[pub.categoria];
-          const cant = CANTIDAD_MAP[pub.cantidadAproximada];
-          const reservaActiva = pub.reservas.find(
-            (r) => r.estado === "ACTIVA" || r.estado === "COMPLETADA"
-          );
-          const tieneConfirmPendiente =
-            reservaActiva &&
-            accionesLocales.some(
-              (a) =>
-                a.tipo === "CONFIRMAR_ENTREGA" &&
-                a.targetId === reservaActiva.id
-            );
-
-          return (
-            <li
-              key={pub.id}
-              className="rounded-2xl border-2 border-slate-900 bg-white p-4 shadow-sm"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-3xl" aria-hidden="true">
-                    {cat.emoji}
-                  </span>
-                  <div>
-                    <h3 className="text-lg font-black text-slate-950">
-                      {cat.label} · {cant.label}
-                    </h3>
-                    <p className="text-xs font-bold text-slate-700">
-                      {cant.referencia}
-                    </p>
-                  </div>
-                </div>
-                <EstadoPublicacionBadge estado={pub.estado} />
-              </div>
-
-              {pub.descripcion && (
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  {pub.descripcion}
-                </p>
-              )}
-
-              <div className="mt-3 flex items-center gap-2 text-sm font-bold text-slate-800">
-                <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>
-                  Retiro: {formatHora(pub.ventanaInicio)} –{" "}
-                  {formatHora(pub.ventanaFin)}
-                </span>
-              </div>
-
-              {reservaActiva && (
-                <div className="mt-3 rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-sm">
-                  <p className="font-extrabold text-slate-950">
-                    Reservado por:{" "}
-                    {reservaActiva.receptor.organizacion ||
-                      reservaActiva.receptor.nombre}
-                  </p>
-                  {reservaActiva.codigoRetiro && (
-                    <p className="mt-1 inline-block rounded-lg border-2 border-slate-900 bg-amber-100 px-2.5 py-0.5 text-xs font-black tracking-wider text-slate-950">
-                      Código de retiro: {reservaActiva.codigoRetiro}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs font-bold text-slate-800">
-                    {reservaActiva.confirmadoReceptor
-                      ? "✓ El comedor ya confirmó retiro"
-                      : "◷ Esperando que el comedor retire"}
-                    {" · "}
-                    {reservaActiva.confirmadoComerciante
-                      ? "✓ Vos confirmaste"
-                      : tieneConfirmPendiente
-                        ? "◷ Confirmación pendiente de envío"
-                        : "Falta tu confirmación"}
-                  </p>
-
-                  {reservaActiva.receptor.telefono && (
-                    <div className="mt-2.5 flex flex-wrap gap-2">
-                      <a
-                        href={formatWhatsappUrl(
-                          reservaActiva.receptor.telefono
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border-2 border-emerald-900 bg-emerald-100 px-3 text-xs font-extrabold text-emerald-950 hover:bg-emerald-200"
-                      >
-                        <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                        <span>WhatsApp</span>
-                      </a>
-                      <a
-                        href={`tel:${reservaActiva.receptor.telefono}`}
-                        className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border-2 border-slate-900 bg-white px-3 text-xs font-extrabold text-slate-950 hover:bg-slate-100"
-                      >
-                        <Phone className="h-4 w-4" aria-hidden="true" />
-                        <span>Llamar</span>
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-4 flex flex-col gap-2">
-                {reservaActiva &&
-                  (pub.estado === "RESERVADO" || pub.estado === "RETIRADO") &&
-                  !reservaActiva.confirmadoComerciante &&
-                  !tieneConfirmPendiente && (
-                    <button
-                      type="button"
-                      disabled={actionId === reservaActiva.id}
-                      onClick={() =>
-                        confirmarEntrega(
-                          reservaActiva.id,
-                          `Confirmar entrega: ${cat.label} (${reservaActiva.receptor.organizacion || reservaActiva.receptor.nombre})`
-                        )
-                      }
-                      className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 text-base font-extrabold text-white hover:bg-emerald-900 disabled:opacity-60"
-                    >
-                      <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                      <span>
-                        {actionId === reservaActiva.id
-                          ? "Confirmando..."
-                          : "Confirmar que ya retiraron"}
-                      </span>
-                    </button>
-                  )}
-
-                {pub.estado === "DISPONIBLE" && (
-                  <Link
-                    href={`/comerciante/editar/${pub.id}`}
-                    className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white px-4 text-sm font-extrabold text-slate-950 hover:bg-slate-100"
-                  >
-                    <Pencil className="h-4 w-4" aria-hidden="true" />
-                    <span>Editar aviso</span>
-                  </Link>
-                )}
-
-                {(pub.estado === "DISPONIBLE" || pub.estado === "EXPIRADO") &&
-                  !reservaActiva && (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteId(pub.id)}
-                      className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border-2 border-rose-800 bg-white px-4 text-sm font-extrabold text-rose-900 hover:bg-rose-50"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      <span>Eliminar aviso</span>
-                    </button>
-                  )}
-
-                {pub.estado === "DISPONIBLE" && (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmCloseId(pub.id)}
-                    className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border-2 border-rose-800 bg-white px-4 text-sm font-extrabold text-rose-900 hover:bg-rose-50"
-                  >
-                    <XCircle className="h-4 w-4" aria-hidden="true" />
-                    <span>Cerrar publicación (ya no disponible)</span>
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
+        {publicaciones.map((pub) => (
+          <AvisoCard
+            key={pub.id}
+            pub={pub}
+            accionesLocales={accionesLocales}
+            actionId={actionId}
+            onConfirmar={confirmarEntrega}
+            onCerrar={setConfirmCloseId}
+            onEliminar={setConfirmDeleteId}
+          />
+        ))}
       </ul>
 
       <ConfirmModal

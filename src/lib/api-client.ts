@@ -12,13 +12,16 @@ export interface ApiResult<T> {
 
 export async function api<T = unknown>(
   url: string,
-  init: Omit<RequestInit, "body"> & { json?: unknown } = {}
+  init: Omit<RequestInit, "body"> & { json?: unknown; timeoutMs?: number } = {}
 ): Promise<ApiResult<T>> {
-  const { json, headers, ...rest } = init;
+  const { json, headers, timeoutMs, ...rest } = init;
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   try {
     const res = await fetch(url, {
       cache: "no-store",
       ...rest,
+      signal: controller?.signal,
       headers: {
         ...(json !== undefined ? { "Content-Type": "application/json" } : {}),
         ...headers,
@@ -36,5 +39,7 @@ export async function api<T = unknown>(
     };
   } catch {
     return { ok: false, status: 0, data: null, error: "Sin conexión con el servidor." };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

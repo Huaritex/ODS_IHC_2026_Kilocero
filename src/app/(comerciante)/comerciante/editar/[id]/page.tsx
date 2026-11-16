@@ -3,9 +3,11 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Camera, Save } from "lucide-react";
 import type { CantidadAproximada, CategoriaAlimento } from "@/lib/types";
+import { MERCADOS_SANTA_CRUZ } from "@/lib/constants";
 import { formatHora } from "@/lib/formato";
+import { comprimirFoto } from "@/lib/foto-cliente";
 import { SelectorCategoria } from "@/components/publicar/SelectorCategoria";
 import { SelectorCantidad } from "@/components/publicar/SelectorCantidad";
 import { api } from "@/lib/api-client";
@@ -43,6 +45,8 @@ export default function EditarPublicacionPage() {
   const [cantidad, setCantidad] = useState<CantidadAproximada | null>(null);
   const [descripcion, setDescripcion] = useState("");
   const [direccion, setDireccion] = useState("");
+  const [mercado, setMercado] = useState("");
+  const [fotoNueva, setFotoNueva] = useState("");
   const [quitarFoto, setQuitarFoto] = useState(false);
   const [extender, setExtender] = useState(0);
   const [guardando, setGuardando] = useState(false);
@@ -61,10 +65,27 @@ export default function EditarPublicacionPage() {
         setCantidad(p.cantidadAproximada);
         setDescripcion(p.descripcion ?? "");
         setDireccion(p.direccionTexto);
+        setMercado(p.mercado);
       }
       setCargando(false);
     })();
   }, [id]);
+
+  function cambiarMercado(nombre: string) {
+    setMercado(nombre);
+    setDireccion(nombre);
+  }
+
+  function elegirFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    comprimirFoto(file)
+      .then((dataUrl) => {
+        setFotoNueva(dataUrl);
+        setQuitarFoto(false);
+      })
+      .catch(() => notify("No pudimos leer esa foto. Probá con otra.", "error"));
+  }
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
@@ -78,11 +99,13 @@ export default function EditarPublicacionPage() {
       descripcion: descripcion.trim(),
       direccionTexto: direccion.trim(),
     };
+    if (mercado !== pub.mercado) cambios.mercado = mercado;
     if (extender > 0) {
       const base = Math.max(new Date(pub.ventanaFin).getTime(), Date.now());
       cambios.ventanaFin = new Date(base + extender * 60_000).toISOString();
     }
-    if (quitarFoto) cambios.fotoUrl = null;
+    if (fotoNueva) cambios.fotoUrl = fotoNueva;
+    else if (quitarFoto) cambios.fotoUrl = null;
 
     const r = await api(`/api/publicaciones/${id}`, { method: "PATCH", json: cambios });
     setGuardando(false);
@@ -164,6 +187,24 @@ export default function EditarPublicacionPage() {
       </fieldset>
 
       <div>
+        <label htmlFor="mercado" className="text-sm font-black uppercase tracking-wide text-slate-950">
+          Mercado
+        </label>
+        <select
+          id="mercado"
+          value={mercado}
+          onChange={(e) => cambiarMercado(e.target.value)}
+          className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 bg-white px-3 text-base font-bold"
+        >
+          {MERCADOS_SANTA_CRUZ.map((m) => (
+            <option key={m.nombre} value={m.nombre}>
+              {m.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
         <label htmlFor="ubicacion" className="text-sm font-black uppercase tracking-wide text-slate-950">
           Ubicación (puesto o pasillo)
         </label>
@@ -175,7 +216,7 @@ export default function EditarPublicacionPage() {
           className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-3 text-base"
         />
         <p className="mt-1 text-xs font-bold text-slate-600">
-          Es lo que verán los comedores. Mercado: {pub.mercado}.
+          Es lo que verán los comedores en la lista y en el mapa.
         </p>
       </div>
 
@@ -193,25 +234,39 @@ export default function EditarPublicacionPage() {
         <p className="mt-1 text-right text-xs font-bold text-slate-600">{descripcion.length}/140</p>
       </div>
 
-      {pub.fotoUrl && (
-        <div className="space-y-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+      <div className="space-y-2">
+        {(fotoNueva || (pub.fotoUrl && !quitarFoto)) && (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={pub.fotoUrl}
-            alt="Foto actual del aviso"
-            className={`h-40 w-full rounded-2xl border-2 border-slate-900 object-cover ${quitarFoto ? "opacity-40" : ""}`}
+            src={fotoNueva || pub.fotoUrl || ""}
+            alt="Foto del aviso"
+            className="h-40 w-full rounded-2xl border-2 border-slate-900 object-cover"
           />
+        )}
+        <label className="flex min-h-[52px] cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-slate-100 px-4 text-sm font-extrabold text-slate-950">
+          <Camera className="h-5 w-5" aria-hidden="true" />
+          <span>{pub.fotoUrl || fotoNueva ? "Cambiar foto" : "Agregar foto"}</span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={elegirFoto}
+            className="sr-only"
+          />
+        </label>
+        {(pub.fotoUrl || fotoNueva) && (
           <label className="flex min-h-[48px] cursor-pointer items-center gap-3 text-sm font-extrabold text-slate-950">
             <input
               type="checkbox"
               className="h-6 w-6 accent-rose-700"
-              checked={quitarFoto}
+              checked={quitarFoto && !fotoNueva}
+              disabled={Boolean(fotoNueva)}
               onChange={(e) => setQuitarFoto(e.target.checked)}
             />
             Quitar la foto
           </label>
-        </div>
-      )}
+        )}
+      </div>
 
       <button
         type="submit"

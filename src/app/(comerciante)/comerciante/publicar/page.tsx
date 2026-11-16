@@ -3,22 +3,17 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  MapPin,
-  Send,
-  Camera,
-  ChevronDown,
-  ChevronUp,
-  Clock,
-} from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import type { CantidadAproximada, CategoriaAlimento } from "@/lib/types";
 import { MERCADOS_SANTA_CRUZ } from "@/lib/constants";
 import { formatHora } from "@/lib/formato";
-import { calcularVentana, VENTANAS_RAPIDAS } from "@/lib/ventanas";
+import { calcularVentana } from "@/lib/ventanas";
 import { comprimirFoto } from "@/lib/foto-cliente";
 import { SelectorCategoria } from "@/components/publicar/SelectorCategoria";
 import { SelectorCantidad } from "@/components/publicar/SelectorCantidad";
+import { SelectorVentana } from "@/components/publicar/SelectorVentana";
+import { UbicacionAviso } from "@/components/publicar/UbicacionAviso";
+import { OpcionalesAviso } from "@/components/publicar/OpcionalesAviso";
 import { enqueuePublicacion, fetchWithTimeout } from "@/lib/offline-queue";
 import { useToast } from "@/components/ToastProvider";
 
@@ -41,8 +36,6 @@ export default function PublicarExcedentePage() {
   const [ventanaId, setVentanaId] = useState("ahora");
   const [descripcion, setDescripcion] = useState("");
   const [fotoUrl, setFotoUrl] = useState<string>("");
-  const [mostrarPuesto, setMostrarPuesto] = useState(false);
-  const [mostrarOpcionales, setMostrarOpcionales] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const startTimeRef = useRef<number>(0);
 
@@ -220,149 +213,22 @@ export default function PublicarExcedentePage() {
       />
 
       {/* 3. Ventana de retiro (siempre visible: es un dato clave) */}
-      <fieldset>
-        <legend className="text-sm font-black uppercase tracking-wide text-slate-950">
-          3. ¿Hasta cuándo pueden retirar?
-        </legend>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {VENTANAS_RAPIDAS.map((v) => {
-            const real = calcularVentana(v.id);
-            const selected = ventanaId === v.id;
-            return (
-              <button
-                key={v.id}
-                type="button"
-                aria-pressed={selected}
-                disabled={!real}
-                onClick={() => setVentanaId(v.id)}
-                className={`flex min-h-[56px] flex-col items-center justify-center rounded-2xl border-2 p-2 text-center disabled:cursor-not-allowed disabled:opacity-50 ${
-                  selected
-                    ? "border-emerald-950 bg-emerald-100 text-emerald-950"
-                    : "border-slate-300 bg-white text-slate-900 hover:border-slate-600"
-                }`}
-              >
-                <span className="text-sm font-black">{v.label}</span>
-                <span className="text-[11px] font-bold text-slate-700">
-                  {real ? `${horaDe(real.inicio)} – ${horaDe(real.fin)}` : "ya pasó"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+      <SelectorVentana value={ventanaId} onChange={setVentanaId} />
 
-      {/* 4. Resumen fijo (no dispara teclado al scrollear) */}
-      <div className="rounded-2xl border-2 border-slate-900 bg-white p-3.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="space-y-1 text-xs font-bold text-slate-800">
-            <p className="flex items-center gap-1.5 text-slate-950">
-              <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{direccionTexto}</span>
-            </p>
-            <p className="flex items-center gap-1.5 text-emerald-900">
-              <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>Retiro hoy: {ventanaActual}</span>
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMostrarPuesto((v) => !v)}
-            className="flex min-h-[48px] shrink-0 items-center gap-1 rounded-xl border-2 border-slate-800 bg-slate-100 px-3 text-xs font-extrabold text-slate-950"
-          >
-            <span>Cambiar</span>
-            {mostrarPuesto ? (
-              <ChevronUp className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <ChevronDown className="h-4 w-4" aria-hidden="true" />
-            )}
-          </button>
-        </div>
+      <UbicacionAviso
+        mercado={mercado}
+        direccionTexto={direccionTexto}
+        ventanaActual={ventanaActual}
+        onMercado={handleSelectMercado}
+        onDireccion={setDireccionTexto}
+      />
 
-        {mostrarPuesto && (
-          <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
-            <div>
-              <label
-                htmlFor="pub-mercado"
-                className="block text-xs font-extrabold uppercase text-slate-700"
-              >
-                Mercado
-              </label>
-              <select
-                id="pub-mercado"
-                value={mercado}
-                onChange={(e) => handleSelectMercado(e.target.value)}
-                className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 bg-white px-3 text-sm font-bold"
-              >
-                {MERCADOS_SANTA_CRUZ.map((m) => (
-                  <option key={m.nombre} value={m.nombre}>
-                    {m.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor="pub-dir"
-                className="block text-xs font-extrabold uppercase text-slate-700"
-              >
-                Puesto o pasillo
-              </label>
-              <input
-                id="pub-dir"
-                value={direccionTexto}
-                onChange={(e) => setDireccionTexto(e.target.value)}
-                className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-3 text-base"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Opcionales colapsables */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setMostrarOpcionales((v) => !v)}
-          className="flex min-h-[48px] w-full items-center justify-between rounded-xl border-2 border-dashed border-slate-400 bg-white px-4 text-sm font-bold text-slate-800"
-        >
-          <span>
-            {fotoUrl || descripcion
-              ? "Foto / nota agregada ✓"
-              : "+ Agregar foto o nota (opcional)"}
-          </span>
-          {mostrarOpcionales ? (
-            <ChevronUp className="h-4 w-4" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="h-4 w-4" aria-hidden="true" />
-          )}
-        </button>
-
-        {mostrarOpcionales && (
-          <div className="mt-2 space-y-3 rounded-2xl border-2 border-slate-300 bg-white p-3.5">
-            <label className="flex min-h-[52px] cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-slate-100 px-4 text-sm font-extrabold text-slate-950">
-              <Camera className="h-5 w-5" aria-hidden="true" />
-              <span>
-                {fotoUrl ? "Foto cargada ✓ (cambiar)" : "Sacar o elegir foto"}
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFotoChange}
-                className="sr-only"
-              />
-            </label>
-            <input
-              aria-label="Nota corta opcional"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              maxLength={140}
-              placeholder="Nota corta (ej. 2 cajas de tomate maduro)"
-              className="min-h-[48px] w-full rounded-xl border-2 border-slate-400 px-3 text-base"
-            />
-          </div>
-        )}
-      </div>
+      <OpcionalesAviso
+        fotoUrl={fotoUrl}
+        descripcion={descripcion}
+        onFoto={handleFotoChange}
+        onDescripcion={setDescripcion}
+      />
 
       {/* CTA al final del formulario: no flota sobre los campos ni sobre el teclado */}
       <button

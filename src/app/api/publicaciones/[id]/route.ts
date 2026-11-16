@@ -3,7 +3,11 @@ import { getSession } from "@/lib/auth";
 import { limpiarPublicacion } from "@/lib/privacidad";
 import { prisma } from "@/lib/prisma";
 import { borrarFoto, guardarFoto } from "@/lib/fotos";
-import { CANTIDADES_APROXIMADAS, CATEGORIAS_ALIMENTO } from "@/lib/constants";
+import {
+  CANTIDADES_APROXIMADAS,
+  CATEGORIAS_ALIMENTO,
+  MERCADOS_SANTA_CRUZ,
+} from "@/lib/constants";
 
 export async function GET(
   _req: Request,
@@ -165,6 +169,15 @@ export async function PATCH(
           typeof body.descripcion === "string" && body.descripcion.trim()
             ? body.descripcion.trim().slice(0, 140)
             : null;
+      }
+      if (body.mercado !== undefined) {
+        const m = MERCADOS_SANTA_CRUZ.find((x) => x.nombre === body.mercado);
+        if (!m) {
+          return NextResponse.json({ error: "Mercado no válido." }, { status: 400 });
+        }
+        data.mercado = m.nombre;
+        data.lat = m.lat;
+        data.lng = m.lng;
       }
       if (body.direccionTexto !== undefined) {
         const dir =
