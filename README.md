@@ -2,6 +2,15 @@
 
 Aplicación web responsive para conectar el excedente diario de alimentos de mercados de Santa Cruz de la Sierra (**Abasto, Mutualista y Los Pozos**) con comedores populares, hogares vulnerables y ONGs antes del cierre (17:00–19:00).
 
+## Sobre el proyecto
+
+- **Materia:** Interacción Humano-Computador (IHC / ISW-231), Universidad Católica Boliviana (UCB), Santa Cruz de la Sierra, semestre 2-2026.
+- **Problema:** parte de los alimentos que sobran al cierre de los mercados se desperdicia, mientras comedores y hogares vulnerables los necesitan. Se alinea con el **ODS 2 (Hambre cero)** y el **ODS 12 (Producción y consumo responsables)**.
+- **Actores:** *comerciante* (publica el excedente), *receptor* (comedor/ONG verificado que reserva y retira) y *administrador* (verifica receptores, modera y audita).
+- **Flujo principal:** el comerciante publica un aviso → el receptor lo explora (lista o mapa) y lo reserva → retiro en el puesto → doble confirmación de entrega → métricas de impacto.
+- **Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Prisma 7 + SQLite (better-sqlite3) · Leaflet/OpenStreetMap · autenticación con JWT (`jose`) y `bcryptjs`.
+- **Equipo:** Huaritex, Brandon Kevin y Ricky (ver historial de commits).
+
 ## Requisitos previos y puesta en marcha
 
 1. **Variables de entorno**
@@ -33,8 +42,9 @@ Aplicación web responsive para conectar el excedente diario de alimentos de mer
 ## Decisiones de diseño y heurísticas de Nielsen por pantalla
 
 - **Login / Registro (`/login`, `/registro`):** Separación clara de roles y botones de acceso demo para reducir fricción en pruebas de usabilidad (*Flexibilidad y eficiencia de uso*).
-- **Comerciante — Mis avisos (`/comerciante`):** Barra inferior fija en la zona del pulgar (≥48x48 px), estado siempre visible con ícono+texto+borde (*Visibilidad del estado del sistema*) y cola local visible ("Pendiente de envío") cuando falla la red. Confirmación modal únicamente al cerrar una publicación de forma irreversible (*Prevención de errores*).
+- **Comerciante — Mis avisos (`/comerciante`):** Acción principal "Publicar excedente" fija en la parte superior y con objetivo táctil grande (≥48x48 px), estado siempre visible con ícono+texto+borde (*Visibilidad del estado del sistema*) y cola local visible ("Pendiente de envío") cuando falla la red. Confirmación modal únicamente al cerrar una publicación de forma irreversible (*Prevención de errores*).
 - **Comerciante — Publicar (`/comerciante/publicar`):** Optimizada para <20 segundos con una mano: selección visual por íconos grandes de categoría y cantidad aproximada ("Poco / Medio / Mucho", sin pedir peso exacto) + puesto prellenado (*Reconocimiento antes que recuerdo*).
+- **Comerciante — Editar (`/comerciante/editar/[id]`):** Permite corregir un aviso mientras esté disponible (alimento, cantidad, nota, foto, mercado, ubicación y hora de retiro) sin tener que borrarlo (*Control y libertad del usuario*).
 - **Receptor — Explorar (`/receptor`):** Toggle Lista/Mapa (Leaflet + OpenStreetMap sin API keys) y filtros por categoría en la parte superior para decidir rápido según cercanía y horario (*Control y libertad del usuario*).
 - **Receptor — Detalle y Reservas (`/receptor/publicaciones/[id]`, `/receptor/reservas`):** Flujo explícito `disponible → reservado → retirado → confirmado`, con doble confirmación de entrega y modal de confirmación solo al cancelar una reserva (*Prevención de errores*).
 - **Admin (`/admin`, `/admin/receptores`, `/admin/publicaciones`, `/admin/locales`, `/admin/auditoria`):** Menú adaptable (barra superior en móvil, lateral en escritorio), tarjetas en móvil y tablas semánticas en pantallas grandes, skip-link, landmarks ARIA y navegación por teclado; métricas de impacto calculadas desde entregas confirmadas, aprobación de receptores por lote, suspensión de locales e historial de auditoría.
@@ -56,6 +66,13 @@ La persistencia es **local con SQLite (Prisma)** en `prisma/dev.db`: sobrevive a
 - `src/components`: componentes reutilizables (`ui/`, `publicar/`, `comerciante/`, `receptor/`).
 - `src/lib`: acceso a la API (`api-client`), utilidades (`formato`, `ventanas`, `lugar`, `explorar`), reglas de negocio (`admin-acciones`, `expiracion`, `privacidad`) y cola offline.
 - `prisma/schema.prisma` y `prisma/seed.ts`: modelo de datos y datos de Santa Cruz.
+
+## Seguridad y privacidad
+
+- Sesión con cookie firmada (JWT) y contraseñas con hash `bcrypt`.
+- Los receptores deben ser **verificados por el admin** antes de reservar; los locales pueden ser **suspendidos** (con motivo visible) y toda acción del admin queda en la **auditoría**.
+- Límite de peticiones (`rate-limit`) y datos de contacto expuestos solo cuando corresponde (`privacidad`).
+- Fotos de avisos validadas y comprimidas en el cliente antes de subirse.
 
 ## Verificación rápida (checklist)
 
