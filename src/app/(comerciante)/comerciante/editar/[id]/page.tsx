@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
 import type { CantidadAproximada, CategoriaAlimento } from "@/lib/types";
-import { CANTIDADES_APROXIMADAS, CATEGORIAS_ALIMENTO } from "@/lib/constants";
+import { formatHora } from "@/lib/formato";
+import { SelectorCategoria } from "@/components/publicar/SelectorCategoria";
+import { SelectorCantidad } from "@/components/publicar/SelectorCantidad";
 import { api } from "@/lib/api-client";
 import { useToast } from "@/components/ToastProvider";
 
@@ -14,6 +16,8 @@ interface Pub {
   categoria: CategoriaAlimento;
   cantidadAproximada: CantidadAproximada;
   descripcion: string | null;
+  mercado: string;
+  direccionTexto: string;
   fotoUrl: string | null;
   ventanaFin: string;
   estado: string;
@@ -26,8 +30,6 @@ const EXTENSIONES = [
   { min: 120, label: "+2 horas" },
 ];
 
-const hora = (iso: string) =>
-  new Date(iso).toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
 
 export default function EditarPublicacionPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +42,7 @@ export default function EditarPublicacionPage() {
   const [categoria, setCategoria] = useState<CategoriaAlimento | null>(null);
   const [cantidad, setCantidad] = useState<CantidadAproximada | null>(null);
   const [descripcion, setDescripcion] = useState("");
+  const [direccion, setDireccion] = useState("");
   const [quitarFoto, setQuitarFoto] = useState(false);
   const [extender, setExtender] = useState(0);
   const [guardando, setGuardando] = useState(false);
@@ -57,6 +60,7 @@ export default function EditarPublicacionPage() {
         setCategoria(p.categoria);
         setCantidad(p.cantidadAproximada);
         setDescripcion(p.descripcion ?? "");
+        setDireccion(p.direccionTexto);
       }
       setCargando(false);
     })();
@@ -72,6 +76,7 @@ export default function EditarPublicacionPage() {
       categoria,
       cantidadAproximada: cantidad,
       descripcion: descripcion.trim(),
+      direccionTexto: direccion.trim(),
     };
     if (extender > 0) {
       const base = Math.max(new Date(pub.ventanaFin).getTime(), Date.now());
@@ -112,10 +117,11 @@ export default function EditarPublicacionPage() {
     );
   }
 
-  const cambioListo = categoria !== null && cantidad !== null;
+  const cambioListo =
+    categoria !== null && cantidad !== null && direccion.trim().length > 0;
 
   return (
-    <form onSubmit={guardar} className="space-y-5 pb-32">
+    <form onSubmit={guardar} className="space-y-5">
       <div>
         <Link
           href="/comerciante"
@@ -126,57 +132,13 @@ export default function EditarPublicacionPage() {
         </Link>
         <h2 className="text-xl font-black text-slate-950">Editar aviso</h2>
         <p className="text-xs font-bold text-slate-700">
-          Retiro hasta las {hora(pub.ventanaFin)}. Solo se puede editar mientras siga disponible.
+          Retiro hasta las {formatHora(pub.ventanaFin)}. Solo se puede editar mientras siga disponible.
         </p>
       </div>
 
-      <fieldset>
-        <legend className="text-sm font-black uppercase tracking-wide text-slate-950">
-          Alimento
-        </legend>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {CATEGORIAS_ALIMENTO.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              aria-pressed={categoria === c.value}
-              onClick={() => setCategoria(c.value)}
-              className={`flex min-h-[58px] items-center gap-2.5 rounded-2xl border-2 px-3 py-2 text-left ${
-                categoria === c.value
-                  ? "border-emerald-950 bg-emerald-100 text-emerald-950"
-                  : "border-slate-300 bg-white text-slate-900 hover:border-slate-600"
-              }`}
-            >
-              <span className="text-2xl" aria-hidden="true">{c.emoji}</span>
-              <span className="text-sm font-extrabold">{c.label}</span>
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <SelectorCategoria legend="Alimento" value={categoria} onChange={setCategoria} />
 
-      <fieldset>
-        <legend className="text-sm font-black uppercase tracking-wide text-slate-950">
-          Cantidad aproximada
-        </legend>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {CANTIDADES_APROXIMADAS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              aria-pressed={cantidad === c.value}
-              onClick={() => setCantidad(c.value)}
-              className={`flex min-h-[68px] flex-col items-center justify-center rounded-2xl border-2 p-2 text-center ${
-                cantidad === c.value
-                  ? "border-emerald-950 bg-emerald-100 text-emerald-950"
-                  : "border-slate-300 bg-white text-slate-900 hover:border-slate-600"
-              }`}
-            >
-              <span className="text-base font-black">{c.label}</span>
-              <span className="text-[11px] font-bold leading-tight text-slate-700">{c.referencia}</span>
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <SelectorCantidad legend="Cantidad aproximada" value={cantidad} onChange={setCantidad} />
 
       <fieldset>
         <legend className="text-sm font-black uppercase tracking-wide text-slate-950">
@@ -200,6 +162,22 @@ export default function EditarPublicacionPage() {
           ))}
         </div>
       </fieldset>
+
+      <div>
+        <label htmlFor="ubicacion" className="text-sm font-black uppercase tracking-wide text-slate-950">
+          Ubicación (puesto o pasillo)
+        </label>
+        <input
+          id="ubicacion"
+          value={direccion}
+          maxLength={120}
+          onChange={(e) => setDireccion(e.target.value)}
+          className="mt-1 min-h-[48px] w-full rounded-xl border-2 border-slate-900 px-3 text-base"
+        />
+        <p className="mt-1 text-xs font-bold text-slate-600">
+          Es lo que verán los comedores. Mercado: {pub.mercado}.
+        </p>
+      </div>
 
       <div>
         <label htmlFor="nota" className="text-sm font-black uppercase tracking-wide text-slate-950">
@@ -235,18 +213,14 @@ export default function EditarPublicacionPage() {
         </div>
       )}
 
-      <div className="fixed right-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 z-30 px-4">
-        <div className="mx-auto max-w-lg md:max-w-2xl">
-          <button
-            type="submit"
-            disabled={guardando || !cambioListo}
-            className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-950 bg-emerald-800 px-6 text-lg font-black text-white shadow-xl hover:bg-emerald-900 disabled:opacity-60"
-          >
-            <Save className="h-5 w-5" aria-hidden="true" />
-            <span>{guardando ? "Guardando..." : "GUARDAR CAMBIOS"}</span>
-          </button>
-        </div>
-      </div>
+      <button
+        type="submit"
+        disabled={guardando || !cambioListo}
+        className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-950 bg-emerald-800 px-6 text-lg font-black text-white shadow-md hover:bg-emerald-900 disabled:opacity-60"
+      >
+        <Save className="h-5 w-5" aria-hidden="true" />
+        <span>{guardando ? "Guardando..." : "GUARDAR CAMBIOS"}</span>
+      </button>
     </form>
   );
 }

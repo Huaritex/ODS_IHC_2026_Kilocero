@@ -1,5 +1,7 @@
 "use client";
 
+import { lugarPublicacion } from "@/lib/lugar";
+import { formatHora } from "@/lib/formato";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -40,12 +42,6 @@ interface PublicacionDisponible {
   };
 }
 
-function formatHora(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-BO", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function calcularDistanciaKm(
   lat1: number,
@@ -368,10 +364,7 @@ export default function ReceptorExplorarPage() {
                   <p className="flex items-center gap-1.5 text-slate-950">
                     <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>
-                      {pub.mercado}
-                      {pub.comerciante.puesto
-                        ? ` (${pub.comerciante.puesto})`
-                        : ` · ${pub.direccionTexto}`}
+                      {lugarPublicacion(pub)}
                       {ordenarPorDistancia
                         ? ` · ~${pub.distanciaKm.toFixed(1)} km`
                         : ""}

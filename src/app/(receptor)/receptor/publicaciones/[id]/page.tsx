@@ -1,5 +1,6 @@
 "use client";
 
+import { lugarPublicacion } from "@/lib/lugar";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -213,10 +214,7 @@ export default function ReceptorPublicacionDetallePage() {
           <p className="flex items-center gap-2">
             <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
-              {pub.mercado}
-              {pub.comerciante.puesto
-                ? ` · ${pub.comerciante.puesto}`
-                : ` · ${pub.direccionTexto}`}
+              {lugarPublicacion(pub)}
             </span>
           </p>
           <p className="flex items-center gap-2 text-emerald-900">

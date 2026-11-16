@@ -2,7 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Ban, Flag, RefreshCw, Search, UserCheck } from "lucide-react";
+import { Ban, Flag, Search, UserCheck } from "lucide-react";
+import { api } from "@/lib/api-client";
+import { ErrorReintentar } from "@/components/ui/ErrorReintentar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ToastProvider";
 import { MERCADOS_SANTA_CRUZ } from "@/lib/constants";
@@ -92,16 +94,10 @@ export default function AdminLocalesPage() {
   const cargar = useCallback(async () => {
     setLoading(true);
     setError(false);
-    try {
-      const res = await fetch("/api/admin/comerciantes", { cache: "no-store" });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setLocales(data.locales || []);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
+    const r = await api<{ locales: LocalRow[] }>("/api/admin/comerciantes");
+    if (r.ok && r.data) setLocales(r.data.locales || []);
+    else setError(true);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -198,20 +194,10 @@ export default function AdminLocalesPage() {
       </p>
 
       {error && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-rose-800 bg-rose-50 p-4 text-sm font-bold text-rose-950"
-        >
-          <span>No se pudo cargar el listado.</span>
-          <button
-            type="button"
-            onClick={cargar}
-            className="inline-flex min-h-[48px] items-center gap-1.5 rounded-xl border-2 border-rose-800 bg-white px-4 text-sm font-extrabold"
-          >
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            Reintentar
-          </button>
-        </div>
+        <ErrorReintentar
+          mensaje="No se pudo cargar el listado."
+          onRetry={cargar}
+        />
       )}
 
       {/* Móvil: tarjetas */}

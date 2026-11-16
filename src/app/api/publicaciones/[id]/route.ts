@@ -166,6 +166,17 @@ export async function PATCH(
             ? body.descripcion.trim().slice(0, 140)
             : null;
       }
+      if (body.direccionTexto !== undefined) {
+        const dir =
+          typeof body.direccionTexto === "string" ? body.direccionTexto.trim() : "";
+        if (!dir) {
+          return NextResponse.json(
+            { error: "Indicá el puesto o pasillo." },
+            { status: 400 }
+          );
+        }
+        data.direccionTexto = dir.slice(0, 120);
+      }
       if (body.ventanaFin !== undefined) {
         const fin = new Date(body.ventanaFin);
         if (Number.isNaN(fin.getTime()) || fin <= new Date() || fin <= publicacion.ventanaInicio) {

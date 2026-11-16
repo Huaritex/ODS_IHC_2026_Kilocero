@@ -1,5 +1,6 @@
 "use client";
 
+import { lugarPublicacion } from "@/lib/lugar";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
@@ -196,10 +197,7 @@ export default function ReceptorReservasPage() {
                   <p className="flex items-center gap-1.5 text-slate-950">
                     <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>
-                      {r.publicacion.mercado}
-                      {r.publicacion.comerciante.puesto
-                        ? ` · ${r.publicacion.comerciante.puesto}`
-                        : ` · ${r.publicacion.direccionTexto}`}
+                      {lugarPublicacion(r.publicacion)}
                     </span>
                   </p>
                   <p className="flex items-center gap-1.5">

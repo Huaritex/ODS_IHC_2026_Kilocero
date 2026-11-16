@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { formatHora, formatWhatsappUrl } from "@/lib/formato";
 import type {
   CantidadAproximada,
   CategoriaAlimento,
@@ -61,17 +62,6 @@ interface PublicacionItem {
   }>;
 }
 
-function formatHora(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-BO", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatWhatsappUrl(telefono: string) {
-  const digits = telefono.replace(/\D/g, "");
-  return `https://wa.me/${digits.startsWith("591") ? digits : `591${digits}`}`;
-}
 
 export default function ComercianteDashboardPage() {
   const { notify } = useToast();

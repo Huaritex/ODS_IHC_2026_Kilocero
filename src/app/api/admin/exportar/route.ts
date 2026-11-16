@@ -63,7 +63,7 @@ export async function GET() {
         reserva?.receptor?.organizacion || reserva?.receptor?.nombre || "N/D";
 
       return [
-        escapeCsv(new Date(p.updatedAt).toLocaleDateString("es-BO")),
+        escapeCsv(new Date(p.updatedAt).toLocaleDateString("es-BO", { timeZone: "America/La_Paz" })),
         escapeCsv(p.mercado),
         escapeCsv(p.comerciante.nombre),
         escapeCsv(cat),

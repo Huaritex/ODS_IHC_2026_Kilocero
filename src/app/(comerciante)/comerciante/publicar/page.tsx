@@ -11,60 +11,16 @@ import {
   Clock,
 } from "lucide-react";
 import type { CantidadAproximada, CategoriaAlimento } from "@/lib/types";
-import {
-  CANTIDADES_APROXIMADAS,
-  CATEGORIAS_ALIMENTO,
-  MERCADOS_SANTA_CRUZ,
-} from "@/lib/constants";
+import { MERCADOS_SANTA_CRUZ } from "@/lib/constants";
+import { formatHora } from "@/lib/formato";
+import { calcularVentana, VENTANAS_RAPIDAS } from "@/lib/ventanas";
+import { comprimirFoto } from "@/lib/foto-cliente";
+import { SelectorCategoria } from "@/components/publicar/SelectorCategoria";
+import { SelectorCantidad } from "@/components/publicar/SelectorCantidad";
 import { enqueuePublicacion, fetchWithTimeout } from "@/lib/offline-queue";
 import { useToast } from "@/components/ToastProvider";
 
-const VENTANAS_RAPIDAS = [
-  { id: "ahora", label: "Próximas 2 horas" },
-  { id: "cierre", label: "Hasta cierre (19:00)" },
-  { id: "tarde", label: "17:30 – 19:30" },
-];
-
-function horaDe(d: Date) {
-  return d.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" });
-}
-
-/** Reduce la foto a máx. 1024 px y JPEG ~0.7 para que pese ~100–200 KB. */
-function comprimirFoto(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const escala = Math.min(1, 1024 / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * escala);
-      canvas.height = Math.round(img.height * escala);
-      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.7));
-    };
-    img.onerror = () => reject(new Error("img"));
-    img.src = url;
-  });
-}
-
-/** Ventana real de un preset, o null si ese horario ya pasó. */
-function calcularVentana(presetId: string): { inicio: Date; fin: Date } | null {
-  const now = new Date();
-  if (presetId === "cierre") {
-    const fin = new Date(now);
-    fin.setHours(19, 0, 0, 0);
-    return fin > now ? { inicio: now, fin } : null;
-  }
-  if (presetId === "tarde") {
-    const inicio = new Date(now);
-    inicio.setHours(17, 30, 0, 0);
-    const fin = new Date(now);
-    fin.setHours(19, 30, 0, 0);
-    return fin > now ? { inicio: inicio > now ? inicio : now, fin } : null;
-  }
-  return { inicio: now, fin: new Date(now.getTime() + 2 * 60 * 60 * 1000) };
-}
+const horaDe = formatHora;
 
 export default function PublicarExcedentePage() {
   const router = useRouter();
@@ -74,7 +30,7 @@ export default function PublicarExcedentePage() {
   const [cantidad, setCantidad] = useState<CantidadAproximada | null>(null);
   const [mercado, setMercado] = useState(MERCADOS_SANTA_CRUZ[0].nombre);
   const [direccionTexto, setDireccionTexto] = useState(
-    `${MERCADOS_SANTA_CRUZ[0].nombre} - Mi puesto`
+    MERCADOS_SANTA_CRUZ[0].nombre
   );
   const [coords, setCoords] = useState({
     lat: MERCADOS_SANTA_CRUZ[0].lat,
@@ -232,7 +188,7 @@ export default function PublicarExcedentePage() {
   const listo = categoria !== null && cantidad !== null;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pb-32">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <h2 className="text-xl font-black text-slate-950">
           Publicar en 4 toques
@@ -242,67 +198,17 @@ export default function PublicarExcedentePage() {
         </p>
       </div>
 
-      {/* 1. Categoría con íconos grandes */}
-      <fieldset>
-        <legend className="text-sm font-black uppercase tracking-wide text-slate-950">
-          1. ¿Qué te quedó?
-        </legend>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {CATEGORIAS_ALIMENTO.map((cat) => {
-            const selected = categoria === cat.value;
-            return (
-              <button
-                key={cat.value}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => setCategoria(cat.value)}
-                className={`flex min-h-[58px] items-center gap-2.5 rounded-2xl border-2 px-3 py-2 text-left transition ${
-                  selected
-                    ? "border-emerald-950 bg-emerald-100 text-emerald-950 shadow-sm"
-                    : "border-slate-300 bg-white text-slate-900 hover:border-slate-600"
-                }`}
-              >
-                <span className="text-2xl leading-none" aria-hidden="true">
-                  {cat.emoji}
-                </span>
-                <span className="text-sm font-extrabold leading-tight">
-                  {cat.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+      <SelectorCategoria
+        legend="1. ¿Qué te quedó?"
+        value={categoria}
+        onChange={setCategoria}
+      />
 
-      {/* 2. Cantidad aproximada */}
-      <fieldset>
-        <legend className="text-sm font-black uppercase tracking-wide text-slate-950">
-          2. ¿Cuánto hay aprox.?
-        </legend>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {CANTIDADES_APROXIMADAS.map((c) => {
-            const selected = cantidad === c.value;
-            return (
-              <button
-                key={c.value}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => setCantidad(c.value)}
-                className={`flex min-h-[68px] flex-col items-center justify-center rounded-2xl border-2 p-2 text-center ${
-                  selected
-                    ? "border-emerald-950 bg-emerald-100 text-emerald-950"
-                    : "border-slate-300 bg-white text-slate-900 hover:border-slate-600"
-                }`}
-              >
-                <span className="text-base font-black">{c.label}</span>
-                <span className="mt-0.5 text-[11px] font-bold leading-tight text-slate-700">
-                  {c.referencia}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+      <SelectorCantidad
+        legend="2. ¿Cuánto hay aprox.?"
+        value={cantidad}
+        onChange={setCantidad}
+      />
 
       {/* 3. Ventana de retiro (siempre visible: es un dato clave) */}
       <fieldset>
@@ -449,25 +355,21 @@ export default function PublicarExcedentePage() {
         )}
       </div>
 
-      {/* CTA Sticky en la zona del pulgar por encima de la nav inferior */}
-      <div className="fixed right-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 z-30 px-4">
-        <div className="mx-auto max-w-lg md:max-w-2xl">
-          <button
-            type="submit"
-            disabled={submitting || !listo}
-            className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-950 bg-emerald-800 px-6 text-lg font-black text-white shadow-xl hover:bg-emerald-900 disabled:opacity-60"
-          >
-            <Send className="h-5 w-5" aria-hidden="true" />
-            <span>
-              {submitting
-                ? "Publicando..."
-                : listo
-                  ? "PUBLICAR EXCEDENTE"
-                  : "Elegí alimento y cantidad"}
-            </span>
-          </button>
-        </div>
-      </div>
+      {/* CTA al final del formulario: no flota sobre los campos ni sobre el teclado */}
+      <button
+        type="submit"
+        disabled={submitting || !listo}
+        className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-slate-950 bg-emerald-800 px-6 text-lg font-black text-white shadow-md hover:bg-emerald-900 disabled:opacity-60"
+      >
+        <Send className="h-5 w-5" aria-hidden="true" />
+        <span>
+          {submitting
+            ? "Publicando..."
+            : listo
+              ? "PUBLICAR EXCEDENTE"
+              : "Elegí alimento y cantidad"}
+        </span>
+      </button>
     </form>
   );
 }

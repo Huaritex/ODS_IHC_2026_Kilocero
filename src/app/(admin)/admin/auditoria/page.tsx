@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { api } from "@/lib/api-client";
+import { ErrorReintentar } from "@/components/ui/ErrorReintentar";
 
 interface Registro {
   id: string;
@@ -42,16 +43,10 @@ export default function AdminAuditoriaPage() {
   const cargar = useCallback(async () => {
     setLoading(true);
     setError(false);
-    try {
-      const res = await fetch("/api/admin/auditoria", { cache: "no-store" });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setRegistros(data.registros || []);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
+    const r = await api<{ registros: Registro[] }>("/api/admin/auditoria");
+    if (r.ok && r.data) setRegistros(r.data.registros || []);
+    else setError(true);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -70,20 +65,7 @@ export default function AdminAuditoriaPage() {
       </div>
 
       {error && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-rose-800 bg-rose-50 p-4 text-sm font-bold text-rose-950"
-        >
-          <span>No se pudo cargar el historial.</span>
-          <button
-            type="button"
-            onClick={cargar}
-            className="inline-flex min-h-[48px] items-center gap-1.5 rounded-xl border-2 border-rose-800 bg-white px-4 text-sm font-extrabold"
-          >
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            Reintentar
-          </button>
-        </div>
+        <ErrorReintentar mensaje="No se pudo cargar el historial." onRetry={cargar} />
       )}
 
       {loading ? (

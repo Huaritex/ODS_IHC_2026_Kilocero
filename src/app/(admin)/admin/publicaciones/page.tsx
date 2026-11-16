@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { EyeOff, RotateCcw, Flag, CheckCircle2, RefreshCw, Trash2 } from "lucide-react";
+import { EyeOff, RotateCcw, Flag, CheckCircle2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type {
   CantidadAproximada,
@@ -10,6 +10,8 @@ import type {
 } from "@/lib/types";
 import { CANTIDAD_MAP, CATEGORIA_MAP } from "@/lib/constants";
 import { EstadoPublicacionBadge } from "@/components/ui/EstadoBadge";
+import { FiltroTabs } from "@/components/ui/FiltroTabs";
+import { ErrorReintentar } from "@/components/ui/ErrorReintentar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ToastProvider";
 
@@ -40,18 +42,10 @@ export default function AdminPublicacionesPage() {
 
   const cargar = useCallback(async () => {
     setError(false);
-    try {
-      const res = await fetch("/api/admin/publicaciones", {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setPublicaciones(data.publicaciones || []);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
+    const r = await api<{ publicaciones: AdminPubRow[] }>("/api/admin/publicaciones");
+    if (r.ok && r.data) setPublicaciones(r.data.publicaciones || []);
+    else setError(true);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -128,52 +122,28 @@ export default function AdminPublicacionesPage() {
         </p>
       </div>
 
-      <div
-        role="group"
-        aria-label="Filtrar publicaciones"
-        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0"
-      >
-        {(
+      <FiltroTabs
+        label="Filtrar publicaciones"
+        opciones={
           [
             ["REPORTADAS", "Reportadas"],
             ["OCULTAS", "Ocultas"],
             ["TODAS", "Todas"],
           ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={filtro === key}
-            onClick={() => setFiltro(key)}
-            className={`min-h-[48px] shrink-0 rounded-xl border-2 px-4 text-sm font-extrabold ${
-              filtro === key
-                ? "border-slate-950 bg-slate-900 text-white"
-                : "border-slate-900 bg-white text-slate-950 hover:bg-slate-100"
-            }`}
-          >
-            {label} ({conteo[key]})
-          </button>
-        ))}
-      </div>
+        }
+        value={filtro}
+        conteo={conteo}
+        onChange={setFiltro}
+      />
 
       {error && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-rose-800 bg-rose-50 p-4 text-sm font-bold text-rose-950"
-        >
-          <span>No se pudo cargar el listado.</span>
-          <button
-            type="button"
-            onClick={() => {
-              setLoading(true);
-              cargar();
-            }}
-            className="inline-flex min-h-[48px] items-center gap-1.5 rounded-xl border-2 border-rose-800 bg-white px-4 text-sm font-extrabold"
-          >
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            Reintentar
-          </button>
-        </div>
+        <ErrorReintentar
+          mensaje="No se pudo cargar el listado."
+          onRetry={() => {
+            setLoading(true);
+            cargar();
+          }}
+        />
       )}
 
       {/* Vista móvil en tarjetas */}
