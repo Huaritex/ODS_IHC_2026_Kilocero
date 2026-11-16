@@ -19,3 +19,8 @@ uploads/
 
 # Script local de commit
 commit.sh
+
+# Documentos y guías de estudio
+documentos/
+guias/
+guia_*.pdf

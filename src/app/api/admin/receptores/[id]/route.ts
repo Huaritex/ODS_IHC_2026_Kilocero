@@ -85,3 +85,53 @@ export async function PATCH(
     return NextResponse.json({ error: "Error interno." }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _req: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session || session.rol !== "ADMIN") {
+      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
+    const { id } = await context.params;
+
+    const receptor = await prisma.usuario.findFirst({
+      where: { id, rol: "RECEPTOR" },
+      select: { nombre: true, organizacion: true },
+    });
+    if (!receptor) {
+      return NextResponse.json({ error: "Receptor no encontrado." }, { status: 404 });
+    }
+
+    const conHistorial = await prisma.reserva.count({
+      where: { receptorId: id, estado: { in: ["ACTIVA", "COMPLETADA"] } },
+    });
+    if (conHistorial > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Tiene reservas activas o entregas realizadas. Rechazalo en lugar de eliminarlo para conservar el historial.",
+        },
+        { status: 409 }
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await registrarAuditoria(
+        session,
+        "RECEPTOR_ELIMINADO",
+        "USUARIO",
+        id,
+        receptor.organizacion || receptor.nombre,
+        tx
+      );
+      await tx.usuario.delete({ where: { id } });
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Error en DELETE /api/admin/receptores/[id]:", error);
+    return NextResponse.json({ error: "Error interno." }, { status: 500 });
+  }
+}

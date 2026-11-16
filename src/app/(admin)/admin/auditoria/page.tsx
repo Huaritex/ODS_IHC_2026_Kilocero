@@ -21,6 +21,8 @@ const ETIQUETAS: Record<string, string> = {
   REPORTE_DESCARTADO: "Reporte descartado",
   LOCAL_SUSPENDIDO: "Local suspendido",
   LOCAL_REACTIVADO: "Local reactivado",
+  PUBLICACION_ELIMINADA: "Publicación eliminada",
+  RECEPTOR_ELIMINADO: "Receptor eliminado",
 };
 
 function cuando(iso: string) {

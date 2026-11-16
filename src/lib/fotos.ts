@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
 
 export const UPLOADS_DIR = path.join(process.cwd(), "uploads");
@@ -32,5 +32,17 @@ export async function leerFoto(nombre: string) {
     return await readFile(path.join(UPLOADS_DIR, nombre));
   } catch {
     return null;
+  }
+}
+
+/** Borra del disco una foto guardada (ignora URLs que no sean propias). */
+export async function borrarFoto(url: string | null | undefined) {
+  if (!url?.startsWith("/api/fotos/")) return;
+  const nombre = url.slice("/api/fotos/".length);
+  if (!NOMBRE_FOTO_RE.test(nombre)) return;
+  try {
+    await unlink(path.join(UPLOADS_DIR, nombre));
+  } catch {
+    /* ya no existía */
   }
 }

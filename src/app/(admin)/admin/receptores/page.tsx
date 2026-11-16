@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, X, RefreshCw, CheckCheck } from "lucide-react";
+import { Check, X, RefreshCw, CheckCheck, Trash2 } from "lucide-react";
+import { api } from "@/lib/api-client";
 import type { EstadoVerificacion } from "@/lib/types";
 import { EstadoVerificacionBadge } from "@/components/ui/EstadoBadge";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -28,6 +29,7 @@ export default function AdminReceptoresPage() {
   const [error, setError] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [batchOpen, setBatchOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ReceptorRow | null>(null);
   const [filtro, setFiltro] = useState<"PENDIENTE" | "VERIFICADO" | "RECHAZADO" | "TODOS">("PENDIENTE");
 
   const cargar = useCallback(async () => {
@@ -79,6 +81,20 @@ export default function AdminReceptoresPage() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  async function eliminar(r: ReceptorRow) {
+    setBusyId(r.id);
+    const res = await api(`/api/admin/receptores/${r.id}`, { method: "DELETE" });
+    setBusyId(null);
+    if (!res.ok) {
+      notify(res.error ?? "No se pudo eliminar.", "error");
+      setDeleteTarget(null);
+      return;
+    }
+    notify("Receptor eliminado.", "info");
+    setDeleteTarget(null);
+    await cargar();
   }
 
   function toggleSel(id: string) {
@@ -274,6 +290,16 @@ export default function AdminReceptoresPage() {
                     <span>Aprobar</span>
                   </button>
                 )}
+                <button
+                  type="button"
+                  disabled={busyId === r.id}
+                  onClick={() => setDeleteTarget(r)}
+                  aria-label={`Eliminar a ${r.organizacion || r.nombre}`}
+                  className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border-2 border-slate-800 bg-white px-3 text-xs font-extrabold text-slate-950 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  <span>Eliminar</span>
+                </button>
                 {r.estadoVerificacion !== "RECHAZADO" && (
                   <button
                     type="button"
@@ -371,6 +397,16 @@ export default function AdminReceptoresPage() {
                           <span>Aprobar</span>
                         </button>
                       )}
+                      <button
+                        type="button"
+                        disabled={busyId === r.id}
+                        onClick={() => setDeleteTarget(r)}
+                        aria-label={`Eliminar a ${r.organizacion || r.nombre}`}
+                        className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border-2 border-slate-800 bg-white px-3 text-xs font-extrabold text-slate-950 hover:bg-slate-100 disabled:opacity-60"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        <span>Eliminar</span>
+                      </button>
                       {r.estadoVerificacion !== "RECHAZADO" && (
                         <button
                           type="button"
@@ -432,6 +468,16 @@ export default function AdminReceptoresPage() {
         loading={busyId === "lote"}
         onConfirm={aprobarLote}
         onCancel={() => setBatchOpen(false)}
+      />
+
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        title="¿Eliminar este receptor?"
+        description={`Se borra la cuenta de ${deleteTarget?.organizacion || deleteTarget?.nombre}. Si tiene entregas o reservas activas no se podrá eliminar: en ese caso rechazalo.`}
+        confirmLabel="Sí, eliminar"
+        loading={Boolean(busyId)}
+        onConfirm={() => deleteTarget && eliminar(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

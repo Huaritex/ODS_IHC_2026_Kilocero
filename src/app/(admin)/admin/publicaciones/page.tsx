@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { EyeOff, RotateCcw, Flag, CheckCircle2, RefreshCw } from "lucide-react";
+import { EyeOff, RotateCcw, Flag, CheckCircle2, RefreshCw, Trash2 } from "lucide-react";
+import { api } from "@/lib/api-client";
 import type {
   CantidadAproximada,
   CategoriaAlimento,
@@ -34,6 +35,7 @@ export default function AdminPublicacionesPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [hideTarget, setHideTarget] = useState<AdminPubRow | null>(null);
   const [error, setError] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AdminPubRow | null>(null);
   const [filtro, setFiltro] = useState<"REPORTADAS" | "OCULTAS" | "TODAS">("TODAS");
 
   const cargar = useCallback(async () => {
@@ -73,6 +75,19 @@ export default function AdminPublicacionesPage() {
     if (filtro === "OCULTAS") return publicaciones.filter((p) => p.ocultaPorAdmin);
     return publicaciones;
   }, [publicaciones, filtro]);
+
+  async function eliminar(p: AdminPubRow) {
+    setBusyId(p.id);
+    const r = await api(`/api/admin/publicaciones/${p.id}`, { method: "DELETE" });
+    setBusyId(null);
+    if (!r.ok) {
+      notify(r.error ?? "No se pudo eliminar.", "error");
+      return;
+    }
+    notify("Publicación eliminada.", "info");
+    setDeleteTarget(null);
+    await cargar();
+  }
 
   async function moderar(
     id: string,
@@ -237,6 +252,18 @@ export default function AdminPublicacionesPage() {
                       <span>Restaurar</span>
                     </button>
                   )}
+                  {p.estado !== "CONFIRMADO" && p.estado !== "RETIRADO" && (
+                    <button
+                      type="button"
+                      disabled={busyId === p.id}
+                      onClick={() => setDeleteTarget(p)}
+                      aria-label={`Eliminar publicación ${labelResumen}`}
+                      className="inline-flex min-h-[48px] items-center justify-center gap-1 rounded-xl border-2 border-slate-800 bg-white px-3 text-xs font-extrabold text-slate-950 hover:bg-slate-100"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      <span>Eliminar</span>
+                    </button>
+                  )}
                   {p.reportada && !p.ocultaPorAdmin && (
                     <button
                       type="button"
@@ -360,6 +387,18 @@ export default function AdminPublicacionesPage() {
                             <span>Restaurar</span>
                           </button>
                         )}
+                        {p.estado !== "CONFIRMADO" && p.estado !== "RETIRADO" && (
+                          <button
+                            type="button"
+                            disabled={busyId === p.id}
+                            onClick={() => setDeleteTarget(p)}
+                            aria-label={`Eliminar publicación ${labelResumen}`}
+                            className="inline-flex min-h-[48px] items-center justify-center gap-1 rounded-xl border-2 border-slate-800 bg-white px-3 text-xs font-extrabold text-slate-950 hover:bg-slate-100"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            <span>Eliminar</span>
+                          </button>
+                        )}
                         {p.reportada && !p.ocultaPorAdmin && (
                           <button
                             type="button"
@@ -393,6 +432,16 @@ export default function AdminPublicacionesPage() {
         loading={Boolean(busyId)}
         onConfirm={() => hideTarget && moderar(hideTarget.id, "OCULTAR")}
         onCancel={() => setHideTarget(null)}
+      />
+
+      <ConfirmModal
+        open={Boolean(deleteTarget)}
+        title="¿Eliminar definitivamente?"
+        description="Se borra la publicación y se cancelan sus reservas activas. Queda registrado en la auditoría."
+        confirmLabel="Sí, eliminar"
+        loading={Boolean(busyId)}
+        onConfirm={() => deleteTarget && eliminar(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

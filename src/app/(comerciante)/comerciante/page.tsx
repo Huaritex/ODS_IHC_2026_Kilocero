@@ -11,7 +11,10 @@ import {
   PlusCircle,
   Phone,
   MessageCircle,
+  Pencil,
+  Trash2,
 } from "lucide-react";
+import { api } from "@/lib/api-client";
 import type {
   CantidadAproximada,
   CategoriaAlimento,
@@ -81,6 +84,7 @@ export default function ComercianteDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
   const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showEncuesta, setShowEncuesta] = useState(false);
 
   const cargarDatos = useCallback(async () => {
@@ -164,6 +168,22 @@ export default function ComercianteDashboardPage() {
     } finally {
       setActionId(null);
     }
+  }
+
+  async function eliminarPublicacion() {
+    if (!confirmDeleteId) return;
+    setActionId(confirmDeleteId);
+    const r = await api(`/api/publicaciones/${confirmDeleteId}`, {
+      method: "DELETE",
+    });
+    setActionId(null);
+    if (!r.ok) {
+      notify(r.error ?? "No se pudo eliminar el aviso.", "error");
+      return;
+    }
+    notify("Aviso eliminado.", "info");
+    setConfirmDeleteId(null);
+    await cargarDatos();
   }
 
   async function cerrarPublicacion() {
@@ -472,6 +492,28 @@ export default function ComercianteDashboardPage() {
                   )}
 
                 {pub.estado === "DISPONIBLE" && (
+                  <Link
+                    href={`/comerciante/editar/${pub.id}`}
+                    className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white px-4 text-sm font-extrabold text-slate-950 hover:bg-slate-100"
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden="true" />
+                    <span>Editar aviso</span>
+                  </Link>
+                )}
+
+                {(pub.estado === "DISPONIBLE" || pub.estado === "EXPIRADO") &&
+                  !reservaActiva && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(pub.id)}
+                      className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border-2 border-rose-800 bg-white px-4 text-sm font-extrabold text-rose-900 hover:bg-rose-50"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      <span>Eliminar aviso</span>
+                    </button>
+                  )}
+
+                {pub.estado === "DISPONIBLE" && (
                   <button
                     type="button"
                     onClick={() => setConfirmCloseId(pub.id)}
@@ -495,6 +537,16 @@ export default function ComercianteDashboardPage() {
         loading={Boolean(actionId)}
         onConfirm={cerrarPublicacion}
         onCancel={() => setConfirmCloseId(null)}
+      />
+
+      <ConfirmModal
+        open={Boolean(confirmDeleteId)}
+        title="¿Eliminar este aviso?"
+        description="Se borra definitivamente y no se puede recuperar. Si solo ya no queda producto, mejor cerralo."
+        confirmLabel="Sí, eliminar"
+        loading={Boolean(actionId)}
+        onConfirm={eliminarPublicacion}
+        onCancel={() => setConfirmDeleteId(null)}
       />
 
       <EncuestaUsabilidadModal
