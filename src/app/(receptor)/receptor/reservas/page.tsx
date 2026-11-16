@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { lugarPublicacion } from "@/lib/lugar";
 import React, { useCallback, useEffect, useState } from "react";
@@ -111,6 +112,12 @@ export default function ReceptorReservasPage() {
 
   return (
     <div className="space-y-4">
+      <Link
+        href="/receptor"
+        className="inline-flex min-h-[48px] items-center text-sm font-bold text-slate-700 underline underline-offset-4"
+      >
+        ← Volver a explorar
+      </Link>
       <h2 className="text-2xl font-black text-slate-950">Mis reservas</h2>
 
       {loading ? (

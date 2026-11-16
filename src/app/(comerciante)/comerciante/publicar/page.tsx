@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   MapPin,
   Send,
   Camera,
@@ -190,6 +192,13 @@ export default function PublicarExcedentePage() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
+        <Link
+          href="/comerciante"
+          className="inline-flex min-h-[48px] items-center gap-1.5 text-sm font-bold text-slate-700 underline underline-offset-4"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Volver a mis avisos
+        </Link>
         <h2 className="text-xl font-black text-slate-950">
           Publicar en 4 toques
         </h2>
